@@ -15,7 +15,6 @@ jobs:
       version-type: ${{ steps.analyze.outputs.version-type }}
       should-release: ${{ steps.analyze.outputs.should-release }}
       new-tag: ${{ steps.analyze.outputs.new-tag }}
-      new-version: ${{ steps.analyze.outputs.new-version}}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,11 +30,11 @@ jobs:
           echo "Latest commit: $LATEST_COMMIT_MSG"
           
           # 获取最新的tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
           echo "Latest tag: $LATEST_TAG"
           
           # 解析版本号
-          if [[ $LATEST_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+          if [[ $LATEST_TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             MAJOR=${BASH_REMATCH[1]}
             MINOR=${BASH_REMATCH[2]} 
             PATCH=${BASH_REMATCH[3]}
@@ -44,7 +43,7 @@ jobs:
             MAJOR=0
             MINOR=0
             PATCH=0
-            echo "使用默认版本: v0.0.0"
+            echo "使用默认版本: 0.0.0"
           fi
           
           # 分析提交信息决定版本类型
@@ -104,8 +103,7 @@ jobs:
           # 设置输出
           echo "version-type=$VERSION_TYPE" >> $GITHUB_OUTPUT
           echo "should-release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
-          echo "new-tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new-tag=$NEW_VERSION" >> $GITHUB_OUTPUT
           
           echo "✅ 输出设置完成"
   create-tag:
@@ -136,15 +134,12 @@ jobs:
   publish:
     needs: [analyze-commits, create-tag]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # ← 允许创建 tag
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # 获取完整历史以计算版本
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-tags: true
+          ref: ${{ needs.analyze-commits.outputs.new-tag }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -157,11 +152,7 @@ jobs:
           pip install build twine
 
       - name: Build package
-        env:
-          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.analyze-commits.outputs.new-version }}
-        run: |
-          echo "正在使用版本: ${{ needs.analyze-commits.outputs.new-version }}"
-          python -m build --verbose
+        run: python -m build --verbose
 
       - name: Publish to PyPI
         if: needs.analyze-commits.outputs.should-release == 'true'
