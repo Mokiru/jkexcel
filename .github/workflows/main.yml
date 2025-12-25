@@ -129,7 +129,6 @@ jobs:
           # 配置Git用户信息
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
           # 创建并推送标签
           git tag $TAG
           git push origin $TAG
