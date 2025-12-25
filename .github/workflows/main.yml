@@ -159,7 +159,9 @@ jobs:
       - name: Build package
         env:
           SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.analyze-commits.outputs.new-version }}
-        run: python -m build --verbose
+        run: |
+          echo "正在使用版本: ${{ needs.analyze-commits.outputs.new-version }}"
+          python -m build --verbose
 
       - name: Publish to PyPI
         if: needs.analyze-commits.outputs.should-release == 'true'
