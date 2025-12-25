@@ -32,3 +32,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/Mokiru/jkexcel"
 Repository = "https://github.com/Mokiru/jkexcel"
+
+[tool.setuptools_scm]
+# 启用版本检测
+version_scheme = "guess-next-dev"
