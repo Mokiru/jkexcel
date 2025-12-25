@@ -135,6 +135,7 @@ jobs:
           git push origin $TAG
           echo "✅ 标签 $TAG 创建成功"
   publish:
+    needs: analyze-commits
     runs-on: ubuntu-latest
     permissions:
       contents: write  # ← 允许创建 tag
@@ -157,7 +158,7 @@ jobs:
       - name: Update version in pyproject.toml (optional)
         run: |
           # 但更推荐用动态版本（见下文）
-          sed -i "s/version = .*/version = \"${{ analyze-commits.outputs.new-version }}\"/" pyproject.toml
+          sed -i "s/version = .*/version = \"${{ needs.analyze-commits.outputs.new-version }}\"/" pyproject.toml
 
       - name: Build package
         run: python -m build
