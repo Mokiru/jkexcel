@@ -157,6 +157,8 @@ jobs:
           pip install build twine
 
       - name: Build package
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ needs.analyze-commits.outputs.new-version }}
         run: python -m build --verbose
 
       - name: Publish to PyPI
