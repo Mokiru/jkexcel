@@ -30,11 +30,11 @@ jobs:
           echo "Latest commit: $LATEST_COMMIT_MSG"
           
           # 获取最新的tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
           
           # 解析版本号
-          if [[ $LATEST_TAG =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+          if [[ $LATEST_TAG =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             MAJOR=${BASH_REMATCH[1]}
             MINOR=${BASH_REMATCH[2]} 
             PATCH=${BASH_REMATCH[3]}
@@ -95,7 +95,7 @@ jobs:
           esac
           
           if [ -z "$NEW_VERSION" ]; then
-            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
           fi
           
           echo "新版本: $NEW_VERSION"
@@ -153,6 +153,10 @@ jobs:
 
       - name: Build package
         run: python -m build --verbose
+
+      - name: Debug version
+        run: |
+          python -c "from setuptools_scm import get_version; print('Detected version:', get_version())"
 
       - name: Publish to PyPI
         if: needs.analyze-commits.outputs.should-release == 'true'
