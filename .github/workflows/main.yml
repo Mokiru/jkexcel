@@ -86,7 +86,7 @@ jobs:
               echo "🔄 Minor 版本升级: v$MAJOR.$MINOR.$PATCH"
               ;;
             "patch")
-              PATCH=$(git rev-list --count HEAD)
+              PATCH=$((PATCH + 1))
               echo "🔄 Patch 版本升级: v$MAJOR.$MINOR.$PATCH"
               ;;
             *)
@@ -155,11 +155,11 @@ jobs:
           pip install build twine
 
       - name: Build package
-        run: python -m build
+        run: python -m build --verbose
 
       - name: Publish to PyPI
         if: needs.analyze-commits.outputs.should-release == 'true'
         env:
           TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_KEY }}
         run: twine upload dist/*
