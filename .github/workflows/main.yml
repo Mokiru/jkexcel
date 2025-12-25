@@ -132,7 +132,7 @@ jobs:
           git push origin $TAG
           echo "✅ 标签 $TAG 创建成功"
   publish:
-    needs: [analyze-commits, create-tag]
+    needs: [ analyze-commits, create-tag ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -152,12 +152,12 @@ jobs:
           pip install build twine
           pip install setuptools_scm[toml]
 
-      - name: Build package
-        run: python -m build --verbose
-
       - name: Debug version
         run: |
           python -c "from setuptools_scm import get_version; print('Detected version:', get_version())"
+
+      - name: Build package
+        run: python -m build --verbose
 
       - name: Publish to PyPI
         if: needs.analyze-commits.outputs.should-release == 'true'
