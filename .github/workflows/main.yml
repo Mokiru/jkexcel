@@ -158,7 +158,7 @@ jobs:
         run: python -m build
 
       - name: Publish to PyPI
-        if: need.analyze-commits.outputs.should-release == 'true'
+        if: needs.analyze-commits.outputs.should-release == 'true'
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
