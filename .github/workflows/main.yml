@@ -134,7 +134,7 @@ jobs:
           git push origin $TAG
           echo "✅ 标签 $TAG 创建成功"
   publish:
-    needs: analyze-commits
+    needs: [analyze-commits, create-tag]
     runs-on: ubuntu-latest
     permissions:
       contents: write  # ← 允许创建 tag
