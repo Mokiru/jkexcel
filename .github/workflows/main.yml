@@ -3,7 +3,7 @@ name: Auto Publish to PyPI
 
 on:
   push:
-    branches: [ master ]  # 或你使用的主分支
+    branches: [ main ]  # 或你使用的主分支
 permissions:
   contents: write
   actions: write
