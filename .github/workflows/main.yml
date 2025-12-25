@@ -154,16 +154,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install build twine
 
-      - name: Update version in pyproject.toml (optional)
-        run: |
-          # 但更推荐用动态版本（见下文）
-          sed -i "s/version = .*/version = \"${{ needs.analyze-commits.outputs.new-version }}\"/" pyproject.toml
-
       - name: Build package
         run: python -m build
 
       - name: Publish to PyPI
-        if: steps.check_tag.outputs.exists == 'false'
+        if: need.analyze-commits.outputs.should-release == 'true'
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
