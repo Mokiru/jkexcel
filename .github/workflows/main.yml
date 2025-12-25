@@ -160,5 +160,6 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_KEY }}
         run: |
+          echo "正在发布到 PyPI"
           echo "${{secrets.PYPI_API_KEY}}"
           twine upload dist/*
