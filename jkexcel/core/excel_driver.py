@@ -15,13 +15,6 @@ from jkexcel.models.exceptions import ExecutionFaultedException
 user32 = ctypes.WinDLL("user32.dll", use_last_error=True)
 oleacc = ctypes.WinDLL("oleacc.dll", use_last_error=True)
 
-# 定义回调函数类型
-WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
-
-# 设置 Windows API 函数的参数和返回值类型
-user32.EnumWindows.argtypes = [WNDENUMPROC, ctypes.wintypes.LPARAM]
-user32.EnumWindows.restype = ctypes.c_bool
-
 # 定义Windows API参数类型
 user32.EnumChildWindows.argtypes = [
     ctypes.wintypes.HWND,
@@ -150,10 +143,10 @@ class ExcelApplicationService:
     def _attach_to_process(processes: List[psutil.Process]) -> Any:
         """从进程句柄获取Excel/WPS COM对象（对应C#的AttachToRunningExcelProcess）"""
         for process in processes:
-            hwnd = ExcelApplicationService.get_main_window_handle(process)
+            hwnd = ExcelApplicationService._get_main_window_handle(process)
             if hwnd == 0:
                 continue
-
+            print(hwnd)
             # 枚举子窗口，筛选Excel/WPS核心窗口
             child_windows = []
 
@@ -182,7 +175,7 @@ class ExcelApplicationService:
         raise ExecutionFaultedException("无法附加到Excel/WPS进程")
 
     @staticmethod
-    def get_main_window_handle(process: psutil.Process) -> Optional[int]:
+    def _get_main_window_handle(process: psutil.Process) -> Optional[int]:
         """
         从 psutil.Process 对象获取进程的主窗口句柄（对应 C# 的 Process.MainWindowHandle）
         参数:
@@ -212,7 +205,8 @@ class ExcelApplicationService:
             return True
 
         # 转换回调函数为 Windows 可调用的类型
-        callback = WNDENUMPROC(enum_windows_callback)
+        callback = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)(
+            enum_windows_callback)
 
         # 枚举所有顶层窗口，查找目标进程的主窗口
         user32.EnumWindows(callback, 0)
