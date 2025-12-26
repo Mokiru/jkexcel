@@ -156,4 +156,7 @@ jobs:
 
       - name: Publish to PyPI
         if: needs.analyze-commits.outputs.should-release == 'true'
+        env:
+          username: __token__
+          password: ${{ secrets.PYPI_API_KEY }}
         run: twine upload dist/*
