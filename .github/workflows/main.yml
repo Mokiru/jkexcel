@@ -156,10 +156,6 @@ jobs:
       - name: Build package
         run: python -m build --verbose
 
-      - name: OIDC
+      - name: OIDC Publish
         if: needs.analyze-commits.outputs.should-release == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
-
-      - name: Publish to PyPI
-        if: needs.analyze-commits.outputs.should-release == 'true'
-        run: twine upload dist/*
