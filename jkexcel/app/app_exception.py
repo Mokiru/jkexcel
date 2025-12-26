@@ -1,2 +1,0 @@
-class ExecutionFaultedException(Exception):
-    pass

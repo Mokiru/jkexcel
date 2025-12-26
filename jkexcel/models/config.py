@@ -1,17 +1,12 @@
-import os
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any, List, Tuple, Literal
 from enum import Enum
-from typing import List, Union, Optional
 
-import pythoncom
-
-from jkexcel.element.excel_base import ExcelElement
-from jkexcel.element.sheet import Sheet
+from jkexcel.models.enums import ExcelType
 
 
-class FileFormat(Enum):
-    """
-    Excel 文件格式
-    """
+class SaveFormat(Enum):
+    """保存格式枚举"""
     xlAddIn = (18, ".xla")  # Microsoft Excel 97-2003 外接程序
     xlAddIn8 = (18, ".xla")  # Microsoft Excel 97-2003 外接程序
     xlCSV = (6, ".csv")  # CSV
@@ -88,61 +83,66 @@ class SaveConflictResolution(Enum):
     xlUserResolution = (1, "弹出对话框请求用户解决冲突")
 
 
-class Workbook(ExcelElement):
-    """封装 Workbook 对象"""
+class SheetVisibility(Enum):
+    """工作表可见性枚举"""
+    VISIBLE = -1
+    HIDDEN = 0
+    VERY_HIDDEN = 2
 
-    def __init__(self, com_workbook, app):
-        super().__init__(app)
-        self._wb = com_workbook
 
-    @property
-    def sheets(self) -> List[Sheet]:
-        """返回所有工作表的 Sheet 对象列表"""
-        return [Sheet(self._wb.Sheets(i + 1)) for i in range(self._wb.Sheets.Count)]
+@dataclass
+class ExcelConfig:
+    """Excel 配置"""
+    driver: ExcelType = ExcelType.OFFICE
+    visible: bool = True # 窗口可见
+    display_alerts: bool = False # 警告弹窗
+    screen_updating: bool = True # 屏幕刷新
+    enable_events: bool = True
+    user_control: bool = True # 是否启用用户控制
+    window_state: Literal["normal", "minimized", "maximized"] = "normal" # 启动后是否最大化窗口
+    read_only_recommended: bool = False
+    update_links: bool = True
 
-    def sheet(self, name_or_index: Union[str, int]) -> Sheet:
-        """获取指定名称或索引的工作表"""
-        if isinstance(name_or_index, str):
-            ws = self._wb.Sheets(name_or_index)
-        else:
-            ws = self._wb.Sheets(name_or_index)
-        return Sheet(ws)
+    def to_dict(self) -> Dict[str, Any]:
+        return {k: v.value if isinstance(v, Enum) else v
+                for k, v in self.__dict__.items()}
 
-    def save(self) -> None:
-        self._wb.Save()
 
-    def save_as(self, file_name: str, file_format: Optional[FileFormat] = None,
-                password: Optional[str] = pythoncom.Missing,
-                write_res_password: Optional[str] = pythoncom.Missing,
-                read_only_recommended: Optional[bool] = pythoncom.Missing,
-                create_backup: Optional[bool] = pythoncom.Missing,
-                access_mode: Optional[SaveAsAccessMode] = None,
-                conflict_resolution: Optional[SaveConflictResolution] = None,
-                add_to_mru: Optional[bool] = pythoncom.Missing,
-                text_code_page: Optional[str] = pythoncom.Missing,
-                text_visual_layout: Optional[object] = pythoncom.Missing,
-                local: Optional[bool] = pythoncom.Missing):
-        if file_format:
-            name_without_ext, _ = os.path.splitext(file_name)
-            file_name = name_without_ext + file_format.value[1]
-        full_path = os.path.abspath(file_name)
-        dir_path = os.path.dirname(full_path)
-        os.makedirs(dir_path, exist_ok=True)
-        file_name = os.path.normpath(file_name)
-        self._wb.SaveAs(file_name, file_format.value[0] if file_format else pythoncom.Missing, password,
-                        write_res_password,
-                        read_only_recommended, create_backup,
-                        access_mode.value[0] if access_mode else pythoncom.Missing,
-                        conflict_resolution.value[0] if conflict_resolution else pythoncom.Missing, add_to_mru,
-                        text_code_page,
-                        text_visual_layout, local)
+@dataclass
+class RangeStyle:
+    """范围样式配置"""
+    font_name: Optional[str] = None
+    font_size: Optional[float] = None
+    font_bold: Optional[bool] = None
+    font_italic: Optional[bool] = None
+    font_color: Optional[int] = None
+    font_color_rgb: Optional[Tuple[int, int, int]] = None
+    fill_color: Optional[int] = None
+    fill_color_rgb: Optional[Tuple[int, int, int]] = None
+    horizontal_alignment: Optional[int] = None
+    vertical_alignment: Optional[int] = None
+    number_format: Optional[str] = None
+    wrap_text: Optional[bool] = None
+    borders: Optional[Dict[str, Any]] = None
 
-    def close(self) -> None:
-        self._wb.Close(SaveChanges=True)
+    class Colors:
+        """颜色常量"""
+        BLACK = 0x000000
+        WHITE = 0xFFFFFF
+        RED = 0xFF0000
+        GREEN = 0x00FF00
+        BLUE = 0x0000FF
+        YELLOW = 0xFFFF00
+        ORANGE = 0xFF6600
+        GRAY = 0xC0C0C0
+        LIGHT_GRAY = 0xF0F0F0
 
-    @property
-    def name(self) -> str:
-        return self._wb.Name
-
-    def __repr__(self) -> str:
-        return f"<Workbook: {self.name}>"
+    class Alignment:
+        """对齐方式常量"""
+        LEFT = -4131
+        CENTER = -4108
+        RIGHT = -4152
+        TOP = -4160
+        MIDDLE = -4108
+        BOTTOM = -4107
+        JUSTIFY = -4130

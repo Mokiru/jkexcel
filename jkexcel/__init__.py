@@ -1,5 +1,38 @@
-from .app.application import ExcelApplication
-from .app.excel_type import ExcelType
-from .app.application_options import ExcelOptions
-from .element.workbook import Workbook
-from .element.sheet import Sheet
+from .core.application import ExcelApp
+from .core.workbook import Workbook
+from .core.workbooks import Workbooks
+from .core.worksheet import Worksheet
+from .core.worksheets import Worksheets
+from .core.range import Range
+from .models.config import ExcelConfig, RangeStyle, SaveFormat, SheetVisibility
+from .models.exceptions import ExcelCOMError, WorkbookNotFoundError, WorksheetNotFoundError, RangeError
+from .operations.data_operations import DataOperations
+from .operations.format_operations import FormatOperations
+
+__all__ = [
+    # 主类
+    'ExcelApp',
+
+    # 核心类
+    'Workbook',
+    'Workbooks',
+    'Worksheet',
+    'Worksheets',
+    'Range',
+
+    # 模型
+    'ExcelConfig',
+    'RangeStyle',
+    'SaveFormat',
+    'SheetVisibility',
+
+    # 异常
+    'ExcelCOMError',
+    'WorkbookNotFoundError',
+    'WorksheetNotFoundError',
+    'RangeError',
+
+    # 操作
+    'DataOperations',
+    'FormatOperations',
+]

@@ -8,12 +8,19 @@ import win32security
 import win32api
 from typing import Optional, List, Tuple, Any
 
-from jkexcel.app.app_exception import ExecutionFaultedException
-from jkexcel.app.excel_type import ExcelType
+from jkexcel.models.enums import ExcelType
+from jkexcel.models.exceptions import ExecutionFaultedException
 
 # Windows API常量/函数封装（对应C#的P/Invoke）
 user32 = ctypes.WinDLL("user32.dll", use_last_error=True)
 oleacc = ctypes.WinDLL("oleacc.dll", use_last_error=True)
+
+# 定义回调函数类型
+WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
+
+# 设置 Windows API 函数的参数和返回值类型
+user32.EnumWindows.argtypes = [WNDENUMPROC, ctypes.wintypes.LPARAM]
+user32.EnumWindows.restype = ctypes.c_bool
 
 # 定义Windows API参数类型
 user32.EnumChildWindows.argtypes = [
@@ -72,14 +79,45 @@ class ExcelApplicationService:
 
     @staticmethod
     def is_admin_process(process: psutil.Process) -> bool:
-        """校验进程是否以管理员权限运行（对应C#的IsAdminProcess）"""
+        """校验进程是否以管理员权限运行"""
         try:
             handle = win32api.OpenProcess(win32con.PROCESS_QUERY_INFORMATION, False, process.pid)
             token = win32security.OpenProcessToken(handle, win32security.TOKEN_QUERY)
-            sid = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
-            principal = win32security.WindowsPrincipal(sid)
-            return principal.IsInRole(win32security.WindowsBuiltInRole.Administrator)
+            sid = win32security.GetTokenInformation(token, win32security.TokenElevationType)
+            return sid in [
+                win32security.TokenElevationTypeFull,
+                win32security.TokenElevationTypeLimited,
+            ]
         except:
+            return True
+
+    @staticmethod
+    def _is_current_user_admin() -> bool:
+        """
+        检查当前用户是否是管理员
+        管理员账号有两个令牌: Full 和 Limited
+        普通只有一个: Default
+        """
+        try:
+            # 获取当前进程令牌
+            token_handle = win32security.OpenProcessToken(
+                win32api.GetCurrentProcess(),
+                win32security.TOKEN_QUERY
+            )
+            # 获取令牌信息
+            token_info = win32security.GetTokenInformation(
+                token_handle,
+                win32security.TokenElevationType
+            )
+            # 关闭令牌句柄
+            win32api.CloseHandle(token_handle)
+            # 检查是否为管理员
+            return token_info in [
+                win32security.TokenElevationTypeFull,  # 完整管理员令牌
+                win32security.TokenElevationTypeLimited,  # 有时是 TokenElevationTypeLimited
+            ]
+
+        except Exception:
             return True
 
     @staticmethod
@@ -88,14 +126,12 @@ class ExcelApplicationService:
         try:
             # 获取指定名称的进程
             process_name = excel_type.value[1]
-            processes = [p for p in psutil.process_iter() if p.name().lower() == process_name.lower()]
+            processes = [p for p in psutil.process_iter(['name', 'pid']) if p.name().lower() == process_name.lower()]
             if not processes:
                 raise ExecutionFaultedException(f"未找到{process_name}进程")
 
             # 校验权限一致性
-            current_is_admin = win32security.WindowsPrincipal(
-                win32security.WindowsIdentity.GetCurrent()
-            ).IsInRole(win32security.WindowsBuiltInRole.Administrator)
+            current_is_admin = ExcelApplicationService._is_current_user_admin()
             target_process = processes[0]
             if current_is_admin != ExcelApplicationService.is_admin_process(target_process):
                 if throw_exception:
@@ -114,7 +150,7 @@ class ExcelApplicationService:
     def _attach_to_process(processes: List[psutil.Process]) -> Any:
         """从进程句柄获取Excel/WPS COM对象（对应C#的AttachToRunningExcelProcess）"""
         for process in processes:
-            hwnd = process.main_window_handle
+            hwnd = ExcelApplicationService.get_main_window_handle(process)
             if hwnd == 0:
                 continue
 
@@ -144,6 +180,44 @@ class ExcelApplicationService:
                     app = win32com.client.Dispatch(ptr)
                     return app.Application
         raise ExecutionFaultedException("无法附加到Excel/WPS进程")
+
+    @staticmethod
+    def get_main_window_handle(process: psutil.Process) -> Optional[int]:
+        """
+        从 psutil.Process 对象获取进程的主窗口句柄（对应 C# 的 Process.MainWindowHandle）
+        参数:
+            process: psutil.Process 对象
+        返回:
+            int: 主窗口句柄（HWND），无主窗口则返回 None
+        """
+        pid = process.pid
+        main_handle = None
+
+        # 定义枚举窗口的回调函数
+        def enum_windows_callback(hwnd: int, lparam: int) -> bool:
+            nonlocal main_handle
+
+            # 获取窗口所属进程的 PID
+            window_pid = ctypes.wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(window_pid))
+
+            # 匹配 PID 且窗口可见
+            if window_pid.value == pid and user32.IsWindowVisible(hwnd):
+                # 获取窗口标题（主窗口通常有非空标题）
+                length = user32.GetWindowTextLengthW(hwnd)
+                if length > 0:
+                    main_handle = hwnd
+                    return False  # 找到主窗口后停止枚举
+
+            return True
+
+        # 转换回调函数为 Windows 可调用的类型
+        callback = WNDENUMPROC(enum_windows_callback)
+
+        # 枚举所有顶层窗口，查找目标进程的主窗口
+        user32.EnumWindows(callback, 0)
+
+        return main_handle
 
     @staticmethod
     def contain_workbook(excel_app: Any, full_name: str) -> bool:
