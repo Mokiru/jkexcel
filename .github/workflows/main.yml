@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   analyze-commits:
-    runs-on: ubuntu-latest  # 使用Linux，避免PowerShell相关问题
+    runs-on: ubuntu-latest
     outputs:
       version-type: ${{ steps.analyze.outputs.version-type }}
       should-release: ${{ steps.analyze.outputs.should-release }}
