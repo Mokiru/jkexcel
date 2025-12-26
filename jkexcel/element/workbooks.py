@@ -1,5 +1,5 @@
-from jkexcel.workbook.excel_base import ExcelElement
-from jkexcel.workbook.workbook import Workbook
+from jkexcel.element.excel_base import ExcelElement
+from jkexcel.element.workbook import Workbook
 
 
 class Workbooks(ExcelElement):

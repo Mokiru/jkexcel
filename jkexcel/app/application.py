@@ -1,34 +1,47 @@
 from jkexcel.app.com_base import ExcelApplicationService
 from jkexcel.app.application_options import ExcelOptions
 from jkexcel.app.excel_type import ExcelType
-from jkexcel.workbook.workbook import Workbook
+from jkexcel.element.workbook import Workbook
 
 
 class ExcelApplication:
 
     def __init__(self, excel_type: ExcelType = ExcelType.OFFICE, excel_option: ExcelOptions = ExcelOptions()):
-        self.excel_app = ExcelApplicationService.attach_to_running_application(excel_type)
-        if not self.excel_app:
-            self.excel_app = ExcelApplicationService.create_application(excel_type)
-        self.excel_app.Visible = excel_option.visible
-        self.excel_app.DisplayAlerts = excel_option.display_alerts
-        self.excel_app.ScreenUpdating = excel_option.screen_updating
+        self._excel_app = ExcelApplicationService.attach_to_running_application(excel_type)
+        if not self._excel_app:
+            self._excel_app = ExcelApplicationService.create_application(excel_type)
+        self._excel_app.Visible = excel_option.visible
+        self._excel_app.DisplayAlerts = excel_option.display_alerts
+        self._excel_app.ScreenUpdating = excel_option.screen_updating
         try:
-            self.excel_app.UserControl = excel_option.user_control
+            self._excel_app.UserControl = excel_option.user_control
         except AttributeError:
             # WPS 免费版或旧版可能无此属性，忽略
             pass
         # 窗口状态
         if excel_option.window_state == "minimized":
-            self.excel_app.WindowState = -4140  # xlMinimized
+            self._excel_app.WindowState = -4140  # xlMinimized
         elif excel_option.window_state == "maximized":
-            self.excel_app.WindowState = -4137  # xlMaximized
+            self._excel_app.WindowState = -4137  # xlMaximized
         else:
-            self.excel_app.WindowState = -4143  # xlNormal
+            self._excel_app.WindowState = -4143  # xlNormal
 
     def open_workbook(self, full_name: str):
-        _wb = self.excel_app.Workbooks.Open(full_name)
+        """
+        打开工作簿
+        :param full_name: 文件路径
+        :return: Workbook
+        """
+        _wb = self._excel_app.Workbooks.Open(full_name)
         return Workbook(_wb, self)
 
     def close(self):
-        self.excel_app.quit()
+        self._excel_app.quit()
+
+    def new_workbook(self):
+        """
+        新建工作簿
+        :return: Workbook
+        """
+        _wb = self._excel_app.Workbooks.Add()
+        return Workbook(_wb, self)
