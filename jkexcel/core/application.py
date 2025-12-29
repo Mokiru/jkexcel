@@ -82,6 +82,7 @@ class ExcelApp:
             self
         """
         try:
+            pythoncom.CoInitialize()
             # 创建 Excel 实例
             if new_app:
                 self._excel = ExcelApplicationService.create_application(excel_type=self._config.driver,
