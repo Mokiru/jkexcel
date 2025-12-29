@@ -27,6 +27,8 @@ classifiers = [
 dependencies = [
     "pywin32>=311",
     "psutil>=7.2.0",
+    "win32security",
+    "pandas"
 ]
 
 [project.urls]
