@@ -163,6 +163,11 @@ class ExcelApp:
         return self._excel
 
     @property
+    def count(self):
+        """获取工作簿数量"""
+        return self._workbooks.count
+
+    @property
     def workbooks(self) -> Workbooks:
         """获取工作簿集合"""
         if not self.is_running:
@@ -247,14 +252,14 @@ class ExcelApp:
             except:
                 pass
 
-    def create_workbook(self) -> Workbook:
+    def create_workbook(self, *args, **kwargs) -> Workbook:
         """
         创建新工作簿
 
         Returns:
             Workbook 对象
         """
-        return self.workbooks.add()
+        return self.workbooks.add(*args, **kwargs)
 
     def open_workbook(self, *args, **kwargs) -> Workbook:
         """

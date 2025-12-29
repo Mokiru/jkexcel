@@ -83,16 +83,19 @@ class Workbooks:
         except Exception as e:
             raise WorkbookNotFoundError(f"获取工作簿失败: {e}")
 
-    def add(self) -> Workbook:
+    def add(self, *args, **kwargs) -> Workbook:
         """
-        添加新工作簿
+        添加新工作簿 并保存
 
         Returns:
             Workbook 对象
         """
         try:
             com_wb = self._workbooks.Add()
-            return Workbook(com_wb, self._excel)
+            wb = Workbook(com_wb, self._excel)
+            if 'file_path' in kwargs:
+                wb.save_as(*args, **kwargs)
+            return wb
         except Exception as e:
             raise WorkbookNotFoundError(f"添加工作簿失败: {e}")
 

@@ -122,7 +122,7 @@ class Workbook:
         except Exception as e:
             raise WorkbookNotFoundError(f"保存工作簿失败: {e}")
 
-    def save_as(self, file_name: str, file_format: Optional[SaveFormat] = None,
+    def save_as(self, file_path: str, file_format: Optional[SaveFormat] = None,
                 password: Optional[str] = pythoncom.Missing,
                 write_res_password: Optional[str] = pythoncom.Missing,
                 read_only_recommended: Optional[bool] = pythoncom.Missing,
@@ -135,7 +135,7 @@ class Workbook:
                 local: Optional[bool] = pythoncom.Missing):
         """
         另存为
-        :param file_name:
+        :param file_path:
         :param file_format:
         :param password:
         :param write_res_password:
@@ -150,12 +150,12 @@ class Workbook:
         :return:
         """
         if file_format:
-            name_without_ext, _ = os.path.splitext(file_name)
+            name_without_ext, _ = os.path.splitext(file_path)
             file_name = name_without_ext + file_format.value[1]
-        full_path = os.path.abspath(file_name)
+        full_path = os.path.abspath(file_path)
         dir_path = os.path.dirname(full_path)
         os.makedirs(dir_path, exist_ok=True)
-        file_name = os.path.normpath(file_name)
+        file_name = os.path.normpath(file_path)
         try:
             self._workbook.SaveAs(file_name, file_format.value[0] if file_format else pythoncom.Missing, password,
                                   write_res_password,
@@ -197,6 +197,8 @@ class Workbook:
 
             self._workbook.Close(SaveChanges=False)
             self._worksheets = None
+            if self._excel.count == 0:
+                self._excel.quit()
         except Exception as e:
             raise WorkbookNotFoundError(f"关闭工作簿失败: {e}")
 
