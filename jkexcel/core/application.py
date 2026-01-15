@@ -8,6 +8,7 @@ from jkexcel.core.excel_driver import ExcelApplicationService
 from jkexcel.core.workbook import Workbook
 from jkexcel.core.workbooks import Workbooks
 from jkexcel.models.config import ExcelConfig
+from jkexcel.models.enums import ExcelType
 from jkexcel.models.exceptions import ExcelNotRunningError, ExcelCOMError
 
 logger = logging.getLogger(__name__)
@@ -16,33 +17,33 @@ logger = logging.getLogger(__name__)
 class ExcelApp:
     """Excel 应用程序封装类"""
 
-    _instance = None
-    _instances = {}  # 多实例管理
+    _instances = {}
+
+    _ref_count = 0
 
     def __new__(cls, *args, **kwargs):
+        if kwargs.get('config', None):
+            driver = kwargs.get('config').driver
+        else:
+            driver = ExcelType.OFFICE
         """单例模式"""
-        if kwargs.get('new_instance', False):
-            instance_id = time.time()
-            instance = super().__new__(cls)
-            cls._instances[instance_id] = instance
-            return instance
-        elif cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+        if driver not in cls._instances:
+            cls._instances[driver] = super().__new__(cls)
+        return cls._instances[driver]
 
-    def __init__(self, config: ExcelConfig = None, new_instance: bool = False):
+    def __init__(self, config: ExcelConfig = None):
         """
         初始化 ExcelApp
         Args:
             config: Excel 配置
-            new_instance: 是否创建新实例
         """
-        if not hasattr(self, '_initialized') or new_instance:
+        if not hasattr(self, '_initialized'):
             self._config = config or ExcelConfig()
             self._excel = None
             self._workbooks = None
             self._initialized = False
             self._pid = None
+            self._closed_by_workbook = False
 
     def __enter__(self):
         """上下文管理器进入"""
@@ -51,7 +52,8 @@ class ExcelApp:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """上下文管理器退出"""
-        self.quit(force=True)
+        if self.is_running:
+            self.quit()
         return False
 
     def __repr__(self) -> str:
@@ -62,18 +64,17 @@ class ExcelApp:
         """清理资源"""
         if self.is_running:
             try:
-                self.quit(force=True)
+                self.quit()
             except:
                 pass
 
-    def start(self, new_app: bool = True, visible: bool = None,
+    def start(self, visible: bool = None,
               display_alerts: bool = None,
               screen_updating: bool = None) -> 'ExcelApp':
         """
         启动 Excel
 
         Args:
-            new_app: 是否新建app/workbooks false则附加到已有app
             visible: 是否可见
             display_alerts: 是否显示警报
             screen_updating: 是否更新屏幕
@@ -81,15 +82,15 @@ class ExcelApp:
         Returns:
             self
         """
+        if self.is_running:
+            return self
         try:
-            pythoncom.CoInitialize()
+            ExcelApp._ref_count += 1
+            if ExcelApp._ref_count <= 1:
+                pythoncom.CoInitialize()
             # 创建 Excel 实例
-            if new_app:
-                self._excel = ExcelApplicationService.create_application(excel_type=self._config.driver,
-                                                                         throw_exception=True)
-            else:
-                self._excel = ExcelApplicationService.attach_to_running_application(excel_type=self._config.driver,
-                                                                                    throw_exception=True)
+            self._excel = ExcelApplicationService.create_application(excel_type=self._config.driver,
+                                                                     throw_exception=True)
             self._pid = self._get_process_id()
 
             # 应用配置
@@ -118,6 +119,7 @@ class ExcelApp:
             return self
 
         except Exception as e:
+            ExcelApp._ref_count -= 1
             self._initialized = False
             raise ExcelNotRunningError(f"启动 Excel 失败: {e}")
 
@@ -216,38 +218,28 @@ class ExcelApp:
         """
         time.sleep(seconds)
 
-    def quit(self, force: bool = False):
+    def quit(self):
         """
         退出 Excel
-
-        Args:
-            force: 是否强制退出（关闭所有工作簿）
         """
+        if not self.is_running or not self._excel:
+            return
+            # 关闭所有工作簿
+        for wb in self.workbooks:
+            try:
+                wb.close(save_changes=False)
+            except:
+                pass
         if not self._excel:
             return
-
-        try:
-            if force:
-                # 关闭所有工作簿
-                for wb in self.workbooks:
-                    try:
-                        wb.close(save_changes=False)
-                    except:
-                        pass
-
-            self._excel.Quit()
-            logger.info("Excel 已退出")
-
-        except Exception as e:
-            logger.error(f"退出 Excel 失败: {e}")
-
-        finally:
-            self._excel = None
-            self._workbooks = None
-            self._initialized = False
-            self._pid = None
-
-            # 释放 COM
+        self._excel.Quit()
+        ExcelApp._ref_count -= 1
+        logger.info("Excel 已退出")
+        self._excel = None
+        self._workbooks = None
+        self._initialized = False
+        self._pid = None
+        if ExcelApp._ref_count <= 0:
             try:
                 pythoncom.CoUninitialize()
             except:
@@ -361,7 +353,7 @@ class ExcelApp:
         """清理所有实例"""
         for instance in cls.get_all_instances():
             try:
-                instance.quit(force=True)
+                instance.quit()
             except:
                 pass
         cls._instances.clear()

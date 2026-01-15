@@ -410,7 +410,7 @@ class Worksheet:
             字典，包含 headers 和 data
         """
         try:
-            data_range = self.get_range(start_cell).current_region
+            data_range = self.get_range(start_cell)
 
             if not data_range:
                 return {"headers": [], "data": []}

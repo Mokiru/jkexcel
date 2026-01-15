@@ -197,6 +197,8 @@ class Workbook:
 
             self._workbook.Close(SaveChanges=False)
             self._worksheets = None
+            
+            # 如果是最后一个工作簿，自动退出 Excel
             if self._excel.count == 0:
                 self._excel.quit()
         except Exception as e:
