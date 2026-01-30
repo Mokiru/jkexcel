@@ -168,6 +168,8 @@ class ExcelApp:
     @property
     def count(self):
         """获取工作簿数量"""
+        if not self.is_running:
+            raise ExcelNotRunningError("Excel 未运行")
         return self._workbooks.count
 
     @property
