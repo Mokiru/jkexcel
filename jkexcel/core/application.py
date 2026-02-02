@@ -235,7 +235,7 @@ class ExcelApp:
         logger.info("Excel 已退出")
         self._excel = None
         self._workbooks = None
-        self._initialized = False
+        self._instance_initialized = False
         self._pid = None
         if ExcelApp._ref_count <= 0:
             try:

@@ -195,10 +195,9 @@ class Workbook:
                 self.save_as(file_path)
             elif save_changes:
                 self.save()
-
+            self._excel.workbooks.on_workbook_closed(self)
             self._workbook.Close(SaveChanges=False)
             self._worksheets = None
-            self._excel.workbooks.on_workbook_closed(self)
         except Exception as e:
             raise WorkbookNotFoundError(f"关闭工作簿失败: {e}")
 
