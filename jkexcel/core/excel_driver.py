@@ -63,7 +63,7 @@ class ExcelApplicationService:
     def create_application(excel_type: ExcelType, throw_exception: bool = False) -> Optional[Any]:
         """创建指定类型的Excel/WPS应用实例"""
         try:
-            app = win32com.client.Dispatch(excel_type.value[0])
+            app = win32com.client.DispatchEx(excel_type.value[0])
             return app
         except Exception:
             if throw_exception:

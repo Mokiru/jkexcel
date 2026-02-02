@@ -357,6 +357,10 @@ Excel 应用程序主类，用于管理 Excel 实例。
 - `calculate()` - 强制计算所有公式
 - `run_macro(macro_name, *args)` - 运行宏
 
+**主要类方法：**
+- `ExcelApp.get_all_instances()` - 获取所有 ExcelApp 实例
+- `ExcelApp.close_all_instances(force=False)` - 关闭所有 ExcelApp 实例
+
 **主要属性：**
 - `is_running` - Excel 是否在运行
 - `version` - Excel 版本
@@ -564,8 +568,13 @@ wps_app.start()
 
 # ... 分别操作 ...
 
-# 清理所有实例
-ExcelApp.cleanup_all()
+# 获取所有实例
+instances = ExcelApp.get_all_instances()
+print(f"当前有 {len(instances)} 个 Excel 实例在运行")
+
+# 关闭所有实例
+closed_count = ExcelApp.close_all_instances()
+print(f"已关闭 {closed_count} 个 Excel 实例")
 ```
 
 ### 批量操作

@@ -1,5 +1,4 @@
 from .core.application import ExcelApp
-from .core.workbook import Workbook
 from .core.workbooks import Workbooks
 from .core.worksheet import Worksheet
 from .core.worksheets import Worksheets
@@ -14,7 +13,6 @@ __all__ = [
     'ExcelApp',
 
     # 核心类
-    'Workbook',
     'Workbooks',
     'Worksheet',
     'Worksheets',
