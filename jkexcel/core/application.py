@@ -355,4 +355,4 @@ class ExcelApp:
                 instance.quit()
             except:
                 pass
-        cls._instances.clear()\
+        cls._instances.clear()
