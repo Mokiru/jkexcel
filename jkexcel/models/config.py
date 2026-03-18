@@ -64,6 +64,52 @@ class SaveFormat(Enum):
     xlWQ1 = (34, ".wq1")  # Quattro Pro 格式
     xlXMLSpreadsheet = (46, ".xml")  # XML 电子表格
 
+    @classmethod
+    def from_value(cls, value: int) -> Optional['SaveFormat']:
+        """
+        根据 int 数值获取对应的枚举类型
+
+        Args:
+            value: 枚举值
+
+        Returns:
+            对应的枚举类型，如果未找到则返回 None
+
+        Example:
+            >>> SaveFormat.from_value(6)
+            <SaveFormat.xlCSV: (6, '.csv')>
+
+            >>> SaveFormat.from_value(51)
+            <SaveFormat.xlOpenXMLWorkbook: (51, '.xlsx')>
+        """
+        for member in cls:
+            if member.value[0] == value:
+                return member
+        return None
+
+    @classmethod
+    def from_value_or_raise(cls, value: int) -> 'SaveFormat':
+        """
+        根据 int 数值获取对应的枚举类型，如果未找到则抛出异常
+
+        Args:
+            value: 枚举值
+
+        Returns:
+            对应的枚举类型
+
+        Raises:
+            ValueError: 当找不到对应的枚举值时抛出
+
+        Example:
+            >>> SaveFormat.from_value_or_raise(6)
+            <SaveFormat.xlCSV: (6, '.csv')>
+        """
+        result = cls.from_value(value)
+        if result is None:
+            raise ValueError(f"未找到值为 {value} 的 SaveFormat 枚举类型")
+        return result
+
 
 class SaveAsAccessMode(Enum):
     """
@@ -72,6 +118,47 @@ class SaveAsAccessMode(Enum):
     xlExclusive = (3, "独占模式")
     xlNoChange = (1, "不更改访问模式")
     xlShared = (2, "共享模式")
+
+    @classmethod
+    def from_value(cls, value: int) -> Optional['SaveAsAccessMode']:
+        """
+        根据 int 数值获取对应的枚举类型
+
+        Args:
+            value: 枚举值
+
+        Returns:
+            对应的枚举类型，如果未找到则返回 None
+
+        Example:
+            >>> SaveAsAccessMode.from_value(1)
+        """
+        for mode in cls:
+            if mode.value[0] == value:
+                return mode
+        return None
+
+    @classmethod
+    def from_value_or_raise(cls, value: int) -> 'SaveAsAccessMode':
+        """
+        根据 int 数值获取对应的枚举类型，如果未找到则抛出异常
+
+        Args:
+            value: 枚举值
+
+        Returns:
+            对应的枚举类型
+
+        Raises:
+            ValueError: 当找不到对应的枚举值时抛出
+
+        Example:
+            >>> SaveFormat.from_value_or_raise(1)
+        """
+        result = cls.from_value(value)
+        if result is None:
+            raise ValueError(f"未找到值为 {value} 的 SaveAsAccessMode 枚举类型")
+        return result
 
 
 class SaveConflictResolution(Enum):
@@ -82,6 +169,47 @@ class SaveConflictResolution(Enum):
     xlOtherSessionChanges = (3, "总是拒绝本地用户所做的更改")
     xlUserResolution = (1, "弹出对话框请求用户解决冲突")
 
+    @classmethod
+    def from_value(cls, value: int) -> Optional['SaveConflictResolution']:
+        """
+        根据 int 数值获取对应的枚举类型
+
+        Args:
+            value: 枚举值
+
+        Returns:
+            对应的枚举类型，如果未找到则返回 None
+
+        Example:
+            >>> SaveConflictResolution.from_value(1)
+        """
+        for mode in cls:
+            if mode.value[0] == value:
+                return mode
+        return None
+
+    @classmethod
+    def from_value_or_raise(cls, value: int) -> 'SaveConflictResolution':
+        """
+        根据 int 数值获取对应的枚举类型，如果未找到则抛出异常
+
+        Args:
+            value: 枚举值
+
+        Returns:
+            对应的枚举类型
+
+        Raises:
+            ValueError: 当找不到对应的枚举值时抛出
+
+        Example:
+            >>> SaveFormat.from_value_or_raise(1)
+        """
+        result = cls.from_value(value)
+        if result is None:
+            raise ValueError(f"未找到值为 {value} 的 SaveConflictResolution 枚举类型")
+        return result
+
 
 class SheetVisibility(Enum):
     """工作表可见性枚举"""
@@ -89,17 +217,58 @@ class SheetVisibility(Enum):
     HIDDEN = 0
     VERY_HIDDEN = 2
 
+    @classmethod
+    def from_value(cls, value: int) -> Optional['SheetVisibility']:
+        """
+        根据 int 数值获取对应的枚举类型
+
+        Args:
+            value: 枚举值
+
+        Returns:
+            对应的枚举类型，如果未找到则返回 None
+
+        Example:
+            >>> SheetVisibility.from_value(1)
+        """
+        for mode in cls:
+            if mode.value[0] == value:
+                return mode
+        return None
+
+    @classmethod
+    def from_value_or_raise(cls, value: int) -> 'SheetVisibility':
+        """
+        根据 int 数值获取对应的枚举类型，如果未找到则抛出异常
+
+        Args:
+            value: 枚举值
+
+        Returns:
+            对应的枚举类型
+
+        Raises:
+            ValueError: 当找不到对应的枚举值时抛出
+
+        Example:
+            >>> SheetVisibility.from_value_or_raise(1)
+        """
+        result = cls.from_value(value)
+        if result is None:
+            raise ValueError(f"未找到值为 {value} 的 SaveConflictResolution 枚举类型")
+        return result
+
 
 @dataclass
 class ExcelConfig:
     """Excel 配置"""
     driver: ExcelType = ExcelType.OFFICE
-    visible: bool = True # 窗口可见
-    display_alerts: bool = False # 警告弹窗
-    screen_updating: bool = True # 屏幕刷新
+    visible: bool = True  # 窗口可见
+    display_alerts: bool = False  # 警告弹窗
+    screen_updating: bool = True  # 屏幕刷新
     enable_events: bool = True
-    user_control: bool = True # 是否启用用户控制
-    window_state: Literal["normal", "minimized", "maximized"] = "normal" # 启动后是否最大化窗口
+    user_control: bool = True  # 是否启用用户控制
+    window_state: Literal["normal", "minimized", "maximized"] = "normal"  # 启动后是否最大化窗口
     read_only_recommended: bool = False
     update_links: bool = True
 
