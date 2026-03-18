@@ -1,5 +1,4 @@
-from typing import List, Optional, Union, Dict, Any
-import win32com.client
+from typing import List, Optional, Dict, Any
 
 from jkexcel.core.range import Range
 from jkexcel.models.config import SheetVisibility, RangeStyle
@@ -9,7 +8,7 @@ from jkexcel.models.exceptions import WorksheetNotFoundError, RangeError
 class Worksheet:
     """Excel 工作表封装类"""
 
-    def __init__(self, com_worksheet):
+    def __init__(self, com_worksheet, excel_app):
         """
         初始化 Worksheet
 
@@ -19,6 +18,7 @@ class Worksheet:
         if com_worksheet is None:
             raise WorksheetNotFoundError("COM Worksheet 对象不能为 None")
         self._worksheet = com_worksheet
+        self._excel = excel_app
 
     def __repr__(self) -> str:
         return f"<Worksheet '{self.name}'>"
@@ -169,26 +169,21 @@ class Worksheet:
             raise WorksheetNotFoundError(f"删除工作表失败: {e}")
 
     def copy(self, before: Optional['Worksheet'] = None,
-             after: Optional['Worksheet'] = None) -> 'Worksheet':
+             after: Optional['Worksheet'] = None) -> None:
         """
         复制工作表
 
         Args:
             before: 复制到指定工作表之前
             after: 复制到指定工作表之后
-
-        Returns:
-            新的 Worksheet 对象
         """
         try:
             if before:
-                new_sheet = self._worksheet.Copy(Before=before.com_object)
+                self._worksheet.Copy(before.com_object, None)
             elif after:
-                new_sheet = self._worksheet.Copy(After=after.com_object)
+                self._worksheet.Copy(None, after.com_object)
             else:
-                new_sheet = self._worksheet.Copy()
-
-            return Worksheet(new_sheet)
+                self._worksheet.Copy()
         except Exception as e:
             raise WorksheetNotFoundError(f"复制工作表失败: {e}")
 

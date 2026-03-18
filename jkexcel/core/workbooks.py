@@ -101,13 +101,13 @@ class Workbook:
     def worksheets(self) -> Worksheets:
         """获取工作表集合"""
         if self._worksheets is None:
-            self._worksheets = Worksheets(self._workbook.Worksheets)
+            self._worksheets = Worksheets(self._workbook.Worksheets, self._excel)
         return self._worksheets
 
     @property
     def sheets(self) -> Worksheets:
         """获取所有表（包括图表等）（别名）"""
-        return Worksheets(self._workbook.Sheets)
+        return Worksheets(self._workbook.Sheets, self._excel)
 
     def activate(self):
         """激活工作簿"""
@@ -250,7 +250,7 @@ class Workbook:
     def get_active_sheet(self) -> Worksheet:
         """获取活动工作表"""
         try:
-            return Worksheet(self._workbook.ActiveSheet)
+            return Worksheet(self._workbook.ActiveSheet, self._excel)
         except Exception as e:
             raise WorkbookNotFoundError(f"获取活动工作表失败: {e}")
 

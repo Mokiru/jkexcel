@@ -1,5 +1,3 @@
-import traceback
-
 import pythoncom
 import psutil
 import time
@@ -30,7 +28,6 @@ class ExcelApp:
         """单例模式"""
         if driver not in cls._instances:
             cls._instances[driver] = super().__new__(cls)
-            cls._instances[driver]._instance_initialized = False
         return cls._instances[driver]
 
     def __init__(self, config: ExcelConfig = None):
@@ -39,11 +36,11 @@ class ExcelApp:
         Args:
             config: Excel 配置
         """
-        if not hasattr(self, '_instance_initialized') or not self._instance_initialized:
+        if not hasattr(self, '_initialized'):
             self._config = config or ExcelConfig()
             self._excel = None
             self._workbooks = None
-            self._instance_initialized = True  # 改为实例级别的标记
+            self._initialized = False
             self._pid = None
             self._closed_by_workbook = False
 
@@ -229,13 +226,19 @@ class ExcelApp:
         if not self.is_running or not self._excel:
             return
             # 关闭所有工作簿
-        self.close_all_workbooks()
+        for wb in self.workbooks:
+            try:
+                wb.close(save_changes=False)
+            except:
+                pass
+        if not self._excel:
+            return
         self._excel.Quit()
         ExcelApp._ref_count -= 1
         logger.info("Excel 已退出")
         self._excel = None
         self._workbooks = None
-        self._instance_initialized = False
+        self._initialized = False
         self._pid = None
         if ExcelApp._ref_count <= 0:
             try:
@@ -345,37 +348,11 @@ class ExcelApp:
         return instances
 
     @classmethod
-    def close_all_instances(cls) -> int:
-        """
-        关闭所有 ExcelApp 实例
-        Returns:
-            关闭的实例数量
-        """
-        closed_count = 0
-        instances = cls.get_all_instances()
-        
-        for instance in instances:
-            try:
-                if instance.is_running:
-                    instance.quit()
-                    closed_count += 1
-                    logger.info(f"已关闭 ExcelApp 实例 (PID: {instance._pid})")
-            except Exception as e:
-                print(traceback.format_exc())
-                logger.warning(f"关闭 ExcelApp 实例失败: {e}")
-        
-        # 清理实例缓存
-        cls._instances.clear()
-        
-        logger.info(f"总共关闭了 {closed_count} 个 ExcelApp 实例")
-        return closed_count
-
-    @classmethod
     def cleanup_all(cls):
-        """清理所有实例（保留为向后兼容）"""
+        """清理所有实例"""
         for instance in cls.get_all_instances():
             try:
                 instance.quit()
             except:
                 pass
-        cls._instances.clear()
+        cls._instances.clear()\

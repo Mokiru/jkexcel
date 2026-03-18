@@ -1,5 +1,4 @@
 from typing import List, Optional, Iterator, Union
-import win32com.client
 
 from jkexcel.core.worksheet import Worksheet
 from jkexcel.models.exceptions import WorksheetNotFoundError
@@ -8,7 +7,7 @@ from jkexcel.models.exceptions import WorksheetNotFoundError
 class Worksheets:
     """Excel 工作表集合封装类"""
 
-    def __init__(self, com_worksheets):
+    def __init__(self, com_worksheets, excel_app):
         """
         初始化 Worksheets
 
@@ -18,6 +17,7 @@ class Worksheets:
         if com_worksheets is None:
             raise WorksheetNotFoundError("COM Worksheets 对象不能为 None")
         self._worksheets = com_worksheets
+        self._excel = excel_app
 
     def __repr__(self) -> str:
         return f"<Worksheets count={self.count}>"
@@ -68,7 +68,7 @@ class Worksheets:
                 com_sheet = self._worksheets(key)
             else:
                 com_sheet = self._worksheets(key)
-            return Worksheet(com_sheet)
+            return Worksheet(com_sheet, self._excel)
         except Exception as e:
             raise WorksheetNotFoundError(f"获取工作表失败: {e}")
 
@@ -100,7 +100,7 @@ class Worksheets:
                         com_sheet = self._worksheets.Add(After=self.get(after).com_object)
                 else:
                     com_sheet = self._worksheets.Add()
-                return Worksheet(com_sheet)
+                return Worksheet(com_sheet, self._excel)
             else:
                 sheets = []
                 for _ in range(count):
@@ -110,7 +110,7 @@ class Worksheets:
                         com_sheet = self._worksheets.Add(After=self.get(after).com_object)
                     else:
                         com_sheet = self._worksheets.Add()
-                    sheets.append(Worksheet(com_sheet))
+                    sheets.append(Worksheet(com_sheet, self._excel))
                 return sheets
         except Exception as e:
             raise WorksheetNotFoundError(f"添加工作表失败: {e}")
@@ -195,7 +195,7 @@ class Worksheets:
 
     def copy(self, sheet_key: Union[int, str, Worksheet],
              before: Optional[Union[int, str, Worksheet]] = None,
-             after: Optional[Union[int, str, Worksheet]] = None) -> Worksheet:
+             after: Optional[Union[int, str, Worksheet]] = None) -> None:
         """
         复制工作表
 
@@ -204,8 +204,7 @@ class Worksheets:
             before: 复制到指定工作表之前
             after: 复制到指定工作表之后
 
-        Returns:
-            新的 Worksheet 对象
+        复制后使用 ExcelApp active_workbook获取新工作簿
         """
         try:
             if isinstance(sheet_key, Worksheet):
@@ -215,18 +214,16 @@ class Worksheets:
 
             if before:
                 if isinstance(before, Worksheet):
-                    new_sheet = sheet.copy(before=before)
+                    sheet.copy(before=before)
                 else:
-                    new_sheet = sheet.copy(before=self.get(before))
+                    sheet.copy(before=self.get(before))
             elif after:
                 if isinstance(after, Worksheet):
-                    new_sheet = sheet.copy(after=after)
+                    sheet.copy(after=after)
                 else:
-                    new_sheet = sheet.copy(after=self.get(after))
+                    sheet.copy(after=self.get(after))
             else:
-                new_sheet = sheet.copy()
-
-            return new_sheet
+                sheet.copy()
         except Exception as e:
             raise WorksheetNotFoundError(f"复制工作表失败: {e}")
 
