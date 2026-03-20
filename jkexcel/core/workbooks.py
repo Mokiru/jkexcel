@@ -351,18 +351,16 @@ class Workbook:
 class Workbooks:
     """Excel 工作簿集合封装类"""
 
-    def __init__(self, com_workbooks, excel_app):
+    def __init__(self, excel_app):
         """
         初始化 Workbooks
 
         Args:
-            com_workbooks: COM Workbooks 对象
             excel_app: ExcelApp 实例
         """
-        if com_workbooks is None:
-            raise WorkbookNotFoundError("COM Workbooks 对象不能为 None")
-        self._workbooks = com_workbooks
-        self._workbook_register: Dict[str, Optional[Workbook]] = {}
+        if excel_app is None:
+            raise WorkbookNotFoundError("COM Excel 对象不能为 None")
+        self._com_object = excel_app.com_object.Workbooks
         self._excel = excel_app
 
     def __repr__(self) -> str:
@@ -377,14 +375,18 @@ class Workbooks:
         return self.get(key)
 
     def __iter__(self) -> Iterator[Workbook]:
-        """迭代工作簿"""
-        for item in list(self._workbook_register.values()):
+        """
+        迭代工作簿
+        """
+        for item in [self.get(i) for i in range(1, self.count + 1)]:
             yield item
 
     @property
     def com_object(self):
-        """获取底层 COM 对象"""
-        return self._workbooks
+        """
+        获取底层 COM 对象
+        """
+        return self._excel.com_object.Workbooks
 
     @property
     def excel_app(self):
@@ -395,7 +397,7 @@ class Workbooks:
     def count(self) -> int:
         """获取工作簿数量"""
         try:
-            return self._workbooks.Count
+            return self._com_object.Count
         except Exception as e:
             raise WorkbookNotFoundError(f"获取工作簿数量失败: {e}")
 
@@ -404,16 +406,7 @@ class Workbooks:
         """获取所有工作簿名称"""
         return [wb.name for wb in self]
 
-    def register_workbook(self, wb: Workbook):
-        """
-        注册工作簿
-
-        Args:
-            wb: 工作簿对象
-        """
-        self._workbook_register[wb.name] = wb
-
-    def get(self, key: Union[int]) -> Workbook:
+    def get(self, key: Union[int | str]) -> Workbook:
         """
         获取工作簿
 
@@ -424,10 +417,8 @@ class Workbooks:
             Workbook 对象
         """
         try:
-            if isinstance(key, int):
-                return list(self._workbook_register.values())[key - 1]
-            elif isinstance(key, str):
-                return self._workbook_register[key]
+            if key is not None:
+                return Workbook(self._com_object.Item(key), self._excel)
             else:
                 raise WorkbookNotFoundError("索引或名称不能为 None")
         except Exception as e:
@@ -441,11 +432,10 @@ class Workbooks:
             Workbook 对象
         """
         try:
-            com_wb = self._workbooks.Add()
+            com_wb = self._com_object.Add()
             wb = Workbook(com_wb, self._excel)
             if 'file_path' in kwargs:
                 wb.save_as(*args, **kwargs)
-            self._workbook_register[wb.name] = wb
             return wb
         except Exception as e:
             raise WorkbookNotFoundError(f"添加工作簿失败: {e}")
@@ -492,7 +482,7 @@ class Workbooks:
             raise FileNotFoundError(f"文件不存在: {file_path}")
 
         try:
-            com_wb = self._workbooks.Open(
+            com_wb = self._com_object.Open(
                 Filename=file_path,
                 UpdateLinks=0 if update_links else 3,  # 0=更新, 3=不更新
                 ReadOnly=read_only,
@@ -510,7 +500,6 @@ class Workbooks:
                 CorruptLoad=corrupt_load.value
             )
             wb = Workbook(com_wb, self._excel)
-            self._workbook_register[wb.name] = wb
             return wb
         except Exception as e:
             raise WorkbookNotFoundError(f"打开工作簿失败: {e}")
@@ -538,7 +527,8 @@ class Workbooks:
         Returns:
             bool
         """
-        return name in self._workbook_register
+        obj = self._com_object.Item(name)
+        return obj is not None
 
     def on_workbook_closed(self, wb: Workbook):
-        self._workbook_register.pop(wb.name)
+        pass

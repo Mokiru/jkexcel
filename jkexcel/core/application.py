@@ -111,7 +111,7 @@ class ExcelApp:
             self._excel.EnableEvents = self._config.enable_events
 
             # 初始化 Workbooks
-            self._workbooks = Workbooks(self._excel.Workbooks, self)
+            self._workbooks = Workbooks(self)
             self._initialized = True
 
             logger.info(f"Excel 启动成功 (PID: {self._pid})")
@@ -160,8 +160,6 @@ class ExcelApp:
     @property
     def com_object(self):
         """获取底层 COM 对象"""
-        if not self.is_running:
-            raise ExcelNotRunningError("Excel 未运行")
         return self._excel
 
     @property
