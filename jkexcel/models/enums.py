@@ -31,9 +31,9 @@ class CorruptLoad(Enum):
     """
     指定文件打开时处理
     """
-    xlNormalLoad = 0 # 正常打开工作簿
-    xlRepairFile = 1 # 尝试修复文件
-    xlExtractData = 2 # 尝试恢复工作簿中的数据
+    xlNormalLoad = 0  # 正常打开工作簿
+    xlRepairFile = 1  # 尝试修复文件
+    xlExtractData = 2  # 尝试恢复工作簿中的数据
 
 
 class BorderWeight(Enum):
@@ -78,3 +78,35 @@ class PaperSize(Enum):
     LETTER = 1
     A4 = 9
     A5 = 11
+
+
+class XlFindLookIn(Enum):
+    """搜索的数据类型"""
+    xlComments = -4144  # 注释
+    xlCommentsThreaded = -4184  # 线程注释
+    xlFormulas = -4123  # 公式
+    xlValues = -4163  # 值
+
+
+class XlLookAt(Enum):
+    """
+    匹配全部搜索文本还是匹配任一部分搜索文本
+    """
+    xlPart = 2  # 匹配任一部分搜索文本
+    xlWhole = 1  # 匹配全部搜索文本
+
+
+class XlSearchOrder(Enum):
+    """
+    指定搜索区域的次序
+    """
+    xlByColumns = 2  # 搜索列，然后移到下一列
+    xlByRows = 1  # 搜索行，然后移到下一行
+
+
+class XlSearchDirection(Enum):
+    """
+    指定搜索区域时的搜索方向
+    """
+    xlNext = 1  # 在区域中搜索下一匹配值
+    xlPrevious = 2  # 在区域中搜索上一匹配值

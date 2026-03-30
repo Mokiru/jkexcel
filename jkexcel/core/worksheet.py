@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any
 
 from jkexcel.core.range import Range
 from jkexcel.models.config import SheetVisibility, RangeStyle
+from jkexcel.models.enums import XlFindLookIn, XlLookAt, XlSearchOrder, XlSearchDirection
 from jkexcel.models.exceptions import WorksheetNotFoundError, RangeError
 
 
@@ -88,6 +89,11 @@ class Worksheet:
             return Range(self._worksheet.UsedRange)
         except Exception as e:
             raise WorksheetNotFoundError(f"获取使用范围失败: {e}")
+
+    @property
+    def cells(self) -> Range:
+        """获取所有单元格"""
+        return Range(self._worksheet.Cells)
 
     def get_range(self, address: str) -> Range:
         """
@@ -469,10 +475,15 @@ class Worksheet:
         """获取当前区域"""
         return self.get_range(start_cell).current_region
 
-    def find(self, what: str, look_in: int = -4163) -> Optional[Range]:
-        """查找内容"""
-        return self.used_range.find(what, look_in)
-
     def find_all(self, what: str, look_in: int = -4163) -> List[Range]:
         """查找所有匹配项"""
         return self.used_range.find_all(what, look_in)
+
+    def find(self, what: str, after: Range = None, look_in: 'XlFindLookIn' = XlFindLookIn.xlValues,
+                   look_at: 'XlLookAt' = XlLookAt.xlWhole,
+                   search_order: 'XlSearchOrder' = XlSearchOrder.xlByRows,
+                   search_direction: 'XlSearchDirection' = XlSearchDirection.xlNext, match_case: bool = False,
+                   match_byte: bool = None, search_format: str = None) -> Range:
+        return Range(
+            self.cells.find(what, after, look_in, look_at, search_order, search_direction, match_case, match_byte,
+                            search_format))

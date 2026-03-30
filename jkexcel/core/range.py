@@ -2,6 +2,7 @@ from typing import Any, List, Tuple, Optional, Union
 import win32com.client
 
 from jkexcel.models.config import RangeStyle
+from jkexcel.models.enums import XlFindLookIn, XlLookAt, XlSearchDirection, XlSearchOrder
 from jkexcel.models.exceptions import RangeError
 
 
@@ -268,24 +269,25 @@ class Range:
         except Exception as e:
             raise RangeError(f"应用样式失败: {e}")
 
-    def find(self, what: str, look_in: int = -4163) -> Optional['Range']:
+    def find(self, what: str, after: 'Range' = None, look_in: 'XlFindLookIn' = XlFindLookIn.xlValues, look_at: 'XlLookAt' = XlLookAt.xlWhole,
+                   search_order: 'XlSearchOrder' = XlSearchOrder.xlByRows, search_direction: 'XlSearchDirection' = XlSearchDirection.xlNext, match_case: bool = False,
+                   match_byte: bool = None, search_format: str = None) -> Optional['Range']:
         """
         查找内容
-
-        Args:
-            what: 要查找的内容
-            look_in: 查找范围
-                -4163: 公式
-                -4123: 值
-                -4144: 批注
-
         Returns:
             找到的范围或 None
         """
         try:
             found = self._range.Find(
                 What=what,
-                LookIn=look_in
+                After=None if after is None else after.com_object,
+                LookIn=look_in.value,
+                LookAt=look_at.value,
+                SearchOrder=search_order.value,
+                SearchDirection=search_direction.value,
+                MatchCase=match_case,
+                MatchByte=match_byte,
+                SearchFormat=search_format
             )
             if found:
                 return Range(found)
