@@ -2,7 +2,8 @@ from typing import Any, List, Tuple, Optional, Union
 import win32com.client
 
 from jkexcel.models.config import RangeStyle
-from jkexcel.models.enums import XlFindLookIn, XlLookAt, XlSearchDirection, XlSearchOrder
+from jkexcel.models.enums import XlFindLookIn, XlLookAt, XlSearchDirection, XlSearchOrder, XlPasteType, \
+    XlPasteSpecialOperation
 from jkexcel.models.exceptions import RangeError
 
 
@@ -188,18 +189,19 @@ class Range:
         except Exception as e:
             raise RangeError(f"复制失败: {e}")
 
-    def paste(self, paste_type: int = -4104):
+    def paste(self, paste: XlPasteType = XlPasteType.xlPasteAll,
+              operation: XlPasteSpecialOperation = XlPasteSpecialOperation.xlPasteSpecialOperationNone,
+              skip_blanks: bool = False, transpose: bool = False):
         """
         粘贴（需要在 copy 之后调用）
-
-        Args:
-            paste_type: 粘贴类型
-                -4104: 全部
-                -4122: 值
-                -4163: 格式
+        paste 粘贴的区域部分
+        operation 粘贴操作
+        skip_blanks 如果true则不将剪贴板上区域中的空白单元格粘贴到目标区域中
+        transpose 如果true则表示在粘贴区域时转置行和列
         """
         try:
-            self._range.PasteSpecial(Paste=paste_type)
+            self._range.PasteSpecial(Paste=paste.value, Operation=operation.value,
+                                     SkipBlanks=skip_blanks, Transpose=transpose)
         except Exception as e:
             raise RangeError(f"粘贴失败: {e}")
 
@@ -269,9 +271,11 @@ class Range:
         except Exception as e:
             raise RangeError(f"应用样式失败: {e}")
 
-    def find(self, what: str, after: 'Range' = None, look_in: 'XlFindLookIn' = XlFindLookIn.xlValues, look_at: 'XlLookAt' = XlLookAt.xlWhole,
-                   search_order: 'XlSearchOrder' = XlSearchOrder.xlByRows, search_direction: 'XlSearchDirection' = XlSearchDirection.xlNext, match_case: bool = False,
-                   match_byte: bool = None, search_format: str = None) -> Optional['Range']:
+    def find(self, what: str, after: 'Range' = None, look_in: 'XlFindLookIn' = XlFindLookIn.xlValues,
+             look_at: 'XlLookAt' = XlLookAt.xlWhole,
+             search_order: 'XlSearchOrder' = XlSearchOrder.xlByRows,
+             search_direction: 'XlSearchDirection' = XlSearchDirection.xlNext, match_case: bool = False,
+             match_byte: bool = None, search_format: str = None) -> Optional['Range']:
         """
         查找内容
         Returns:

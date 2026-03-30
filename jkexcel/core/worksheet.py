@@ -480,10 +480,9 @@ class Worksheet:
         return self.used_range.find_all(what, look_in)
 
     def find(self, what: str, after: Range = None, look_in: 'XlFindLookIn' = XlFindLookIn.xlValues,
-                   look_at: 'XlLookAt' = XlLookAt.xlWhole,
-                   search_order: 'XlSearchOrder' = XlSearchOrder.xlByRows,
-                   search_direction: 'XlSearchDirection' = XlSearchDirection.xlNext, match_case: bool = False,
-                   match_byte: bool = None, search_format: str = None) -> Range:
-        return Range(
-            self.cells.find(what, after, look_in, look_at, search_order, search_direction, match_case, match_byte,
-                            search_format))
+             look_at: 'XlLookAt' = XlLookAt.xlWhole,
+             search_order: 'XlSearchOrder' = XlSearchOrder.xlByRows,
+             search_direction: 'XlSearchDirection' = XlSearchDirection.xlNext, match_case: bool = False,
+             match_byte: bool = None, search_format: str = None) -> Range:
+        return self.cells.find(what, after, look_in, look_at, search_order, search_direction, match_case, match_byte,
+                               search_format)
