@@ -162,17 +162,20 @@ class Range:
         except Exception as e:
             raise RangeError(f"设置值失败: {e}")
 
-    def clear(self, clear_format: bool = False):
+    def clear(self, clear_contents: bool = False, clear_format: bool = False):
         """
         清除范围内容
 
         Args:
+            clear_contents: 是否清除内容
             clear_format: 是否清除格式
         """
         try:
-            if clear_format:
+            if clear_contents and clear_format:
                 self._range.Clear()
-            else:
+            elif not clear_contents and clear_format:
+                self._range.ClearFormats()
+            elif clear_contents and not clear_format:
                 self._range.ClearContents()
         except Exception as e:
             raise RangeError(f"清除失败: {e}")
