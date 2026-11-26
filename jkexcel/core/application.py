@@ -1,6 +1,8 @@
 import pythoncom
 import psutil
 import time
+import ctypes
+import ctypes.wintypes
 from typing import Optional, List, Dict, Any
 import logging
 
@@ -125,13 +127,25 @@ class ExcelApp:
     def _get_process_id(self) -> Optional[int]:
         """获取进程 ID"""
         try:
-            return self._excel.Hwnd
+            # Hwnd 是窗口句柄而非 PID，需通过窗口句柄反查进程 ID
+            hwnd = self._excel.Hwnd
+            pid = ctypes.wintypes.DWORD()
+            ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value:
+                return pid.value
         except:
-            # 通过进程名查找
-            for proc in psutil.process_iter(['pid', 'name']):
-                if proc.info['name'] and 'EXCEL.EXE' in proc.info['name'].upper():
-                    return proc.info['pid']
-            return None
+            pass
+        # 通过驱动对应的进程名查找
+        if self._config.driver == ExcelType.WPS:
+            # WPS 表格实际进程名可能为 et.exe/ket.exe，wps.exe 为集成主进程
+            process_names = {'wps.exe', 'et.exe', 'ket.exe'}
+        else:
+            # Microsoft Office Excel
+            process_names = {'excel.exe'}
+        for proc in psutil.process_iter(['pid', 'name']):
+            if proc.info['name'] and proc.info['name'].lower() in process_names:
+                return proc.info['pid']
+        return None
 
     @property
     def is_running(self) -> bool:

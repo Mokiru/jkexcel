@@ -189,17 +189,56 @@ class Workbook:
         Args:
             save_changes: 是否保存更改
             file_path: 保存路径（如果为None则使用原路径）
+
+        Note:
+            从未保存过的新工作簿若需保存，必须指定 file_path，
+            否则 Save 会弹出"另存为"模态对话框导致 COM 调用阻塞。
         """
+        if self._workbook is None:
+            # 已关闭，避免对已释放的 COM 对象重复操作
+            return
+        com_app = None
+        saved_state = {}
         try:
+            # 关闭期间临时禁用弹窗/事件/交互，防止模态对话框或单元格编辑状态阻塞 COM 调用
+            try:
+                com_app = self._workbook.Application
+            except Exception:
+                com_app = None
+            if com_app is not None:
+                for attr in ("DisplayAlerts", "EnableEvents", "Interactive"):
+                    try:
+                        saved_state[attr] = getattr(com_app, attr)
+                        setattr(com_app, attr, False)
+                    except Exception:
+                        saved_state.pop(attr, None)
+
             if save_changes and file_path:
                 self.save_as(file_path)
             elif save_changes:
+                if not self._workbook.Path:
+                    raise ValueError("工作簿从未保存过，关闭并保存需指定 file_path")
                 self.save()
+            else:
+                # 标记为已保存，防止 Close 触发保存确认弹窗
+                try:
+                    self._workbook.Saved = True
+                except Exception:
+                    pass
             self._excel.workbooks.on_workbook_closed(self)
             self._workbook.Close(SaveChanges=False)
             self._worksheets = None
+            self._workbook = None
         except Exception as e:
             raise WorkbookNotFoundError(f"关闭工作簿失败: {e}")
+        finally:
+            # 恢复应用原有状态
+            if com_app is not None:
+                for attr, value in saved_state.items():
+                    try:
+                        setattr(com_app, attr, value)
+                    except Exception:
+                        pass
 
     def protect(self, password: str = "",
                 structure: bool = True,
@@ -484,7 +523,7 @@ class Workbooks:
         try:
             com_wb = self._com_object.Open(
                 Filename=file_path,
-                UpdateLinks=0 if update_links else 3,  # 0=更新, 3=不更新
+                UpdateLinks=3 if update_links else 0,  # 3=更新, 0=不更新
                 ReadOnly=read_only,
                 Format=sep_format.value if sep_format else pythoncom.Missing,
                 Password=password,
@@ -527,8 +566,12 @@ class Workbooks:
         Returns:
             bool
         """
-        obj = self._com_object.Item(name)
-        return obj is not None
+        try:
+            self._com_object.Item(name)
+            return True
+        except Exception:
+            # Item 在名称不存在时抛出 COM 异常，应返回 False 而非向上传播
+            return False
 
     def on_workbook_closed(self, wb: Workbook):
         pass

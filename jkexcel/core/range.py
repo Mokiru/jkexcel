@@ -1,4 +1,5 @@
 from typing import Any, List, Tuple, Optional, Union
+import pythoncom
 import win32com.client
 
 from jkexcel.models.config import RangeStyle
@@ -49,7 +50,7 @@ class Range:
     def value(self, value: Any):
         """设置范围的值"""
         try:
-            self._range.Value = value
+            self._range.Value = self._normalize_values(value)
         except Exception as e:
             raise RangeError(f"设置值失败: {e}")
 
@@ -125,6 +126,42 @@ class Range:
         except Exception as e:
             raise RangeError(f"设置列宽失败: {e}")
 
+    @property
+    def current_region(self) -> 'Range':
+        """获取当前区域（以空行空列为界的连续数据区域）"""
+        try:
+            return Range(self._range.CurrentRegion)
+        except Exception as e:
+            raise RangeError(f"获取当前区域失败: {e}")
+
+    def resize(self, rows: int = None, cols: int = None) -> 'Range':
+        """
+        调整范围大小
+
+        Args:
+            rows: 行数（None 保持原行数）
+            cols: 列数（None 保持原列数）
+
+        Returns:
+            调整后的新 Range 对象
+        """
+        try:
+            if rows is None:
+                rows = self._range.Rows.Count
+            if cols is None:
+                cols = self._range.Columns.Count
+            # 不使用 COM Resize：部分 pywin32 动态绑定环境下会被误解析为属性，
+            # 改用 Cells/Range 按行列号计算新区域
+            start_row = self._range.Row
+            start_col = self._range.Column
+            sheet = self._range.Worksheet
+            return Range(sheet.Range(
+                sheet.Cells(start_row, start_col),
+                sheet.Cells(start_row + rows - 1, start_col + cols - 1)
+            ))
+        except Exception as e:
+            raise RangeError(f"调整范围大小失败: {e}")
+
     def get_values(self) -> List[List[Any]]:
         """
         获取范围的值（二维列表）
@@ -150,6 +187,18 @@ class Range:
         except Exception as e:
             raise RangeError(f"获取值失败: {e}")
 
+    @staticmethod
+    def _normalize_values(value: Any) -> Any:
+        """将一维列表规范化为二维列表，避免 COM 按列写入或只写首个元素"""
+        if isinstance(value, (list, tuple)):
+            if len(value) == 0:
+                return value
+            if not isinstance(value[0], (list, tuple)):
+                # 一维列表视为单行数据
+                return [list(value)]
+            return [list(row) if isinstance(row, (list, tuple)) else [row] for row in value]
+        return value
+
     def set_values(self, values: Union[List[List[Any]], List[Any], Any]):
         """
         设置范围的值
@@ -158,11 +207,11 @@ class Range:
             values: 值，可以是二维列表、一维列表或单个值
         """
         try:
-            self._range.Value = values
+            self._range.Value = self._normalize_values(values)
         except Exception as e:
             raise RangeError(f"设置值失败: {e}")
 
-    def clear(self, clear_contents: bool = False, clear_format: bool = False):
+    def clear(self, clear_contents: bool = True, clear_format: bool = True):
         """
         清除范围内容
 
@@ -188,7 +237,10 @@ class Range:
             destination: 目标范围，None 表示复制到剪贴板
         """
         try:
-            self._range.Copy(Destination=destination.com_object if destination else None)
+            if destination is not None:
+                self._range.Copy(Destination=destination.com_object)
+            else:
+                self._range.Copy()
         except Exception as e:
             raise RangeError(f"复制失败: {e}")
 
@@ -278,7 +330,7 @@ class Range:
              look_at: 'XlLookAt' = XlLookAt.xlWhole,
              search_order: 'XlSearchOrder' = XlSearchOrder.xlByRows,
              search_direction: 'XlSearchDirection' = XlSearchDirection.xlNext, match_case: bool = False,
-             match_byte: bool = None, search_format: str = None) -> Optional['Range']:
+             match_byte: bool = False, search_format: bool = False) -> Optional['Range']:
         """
         查找内容
         Returns:
@@ -287,7 +339,7 @@ class Range:
         try:
             found = self._range.Find(
                 What=what,
-                After=None if after is None else after.com_object,
+                After=pythoncom.Missing if after is None else after.com_object,
                 LookIn=look_in.value,
                 LookAt=look_at.value,
                 SearchOrder=search_order.value,
@@ -334,21 +386,21 @@ class Range:
         except Exception as e:
             raise RangeError(f"查找所有失败: {e}")
 
-    def replace(self, what: str, replacement: str, look_in: int = -4163):
+    def replace(self, what: str, replacement: str, look_at: 'XlLookAt' = XlLookAt.xlWhole):
         """
         替换内容
 
         Args:
             what: 要查找的内容
             replacement: 替换为的内容
-            look_in: 查找范围
+            look_at: 匹配方式（完全匹配/部分匹配）
         """
         try:
+            # Replace 不支持 LookIn 参数，传入会报 TypeError
             self._range.Replace(
                 What=what,
                 Replacement=replacement,
-                LookAt=1,  # 完全匹配
-                LookIn=look_in
+                LookAt=look_at.value
             )
         except Exception as e:
             raise RangeError(f"替换失败: {e}")

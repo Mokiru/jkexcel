@@ -49,7 +49,7 @@ def cell_address_to_indices(address: str) -> Tuple[int, int]:
     Returns:
         (行号, 列号)
     """
-    match = re.match(r'([A-Z]+)(\d+)$', address.upper())
+    match = re.match(r'([A-Z]+)(\d+)$', address.upper().replace('$', ''))
     if not match:
         raise ValueError(f"无效的单元格地址: {address}")
 

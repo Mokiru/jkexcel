@@ -184,6 +184,7 @@ class Worksheet:
             after: 复制到指定工作表之后
         """
         try:
+            # 注意：动态绑定下 Copy 的关键字参数会丢失，必须用位置参数 + None 占位
             if before:
                 self._worksheet.Copy(before.com_object, None)
             elif after:
@@ -411,11 +412,8 @@ class Worksheet:
             字典，包含 headers 和 data
         """
         try:
-            data_range = self.get_range(start_cell)
-
-            if not data_range:
-                return {"headers": [], "data": []}
-
+            # 从起始单元格扩展到整个连续数据区域，而不是只读单个单元格
+            data_range = self.get_range(start_cell).current_region
             values = data_range.get_values()
 
             if has_headers and values:
@@ -483,6 +481,6 @@ class Worksheet:
              look_at: 'XlLookAt' = XlLookAt.xlWhole,
              search_order: 'XlSearchOrder' = XlSearchOrder.xlByRows,
              search_direction: 'XlSearchDirection' = XlSearchDirection.xlNext, match_case: bool = False,
-             match_byte: bool = None, search_format: str = None) -> Range:
+             match_byte: bool = False, search_format: bool = False) -> Range:
         return self.cells.find(what, after, look_in, look_at, search_order, search_direction, match_case, match_byte,
                                search_format)
