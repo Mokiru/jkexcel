@@ -3,6 +3,7 @@ from typing import List, Optional, Iterator, Union, Dict
 
 import pythoncom
 
+from jkexcel.core.range import Range
 from jkexcel.core.worksheet import Worksheet
 from jkexcel.core.worksheets import Worksheets
 from jkexcel.models.config import SaveFormat, SaveAsAccessMode, SaveConflictResolution
@@ -116,8 +117,15 @@ class Workbook:
         except Exception as e:
             raise WorkbookNotFoundError(f"激活工作簿失败: {e}")
 
-    def save(self):
-        """保存工作簿"""
+    def save(self, file_path: str = None):
+        """
+        保存工作簿
+
+        Args:
+            file_path: 可选保存路径；指定时等同 save_as（首次保存的新工作簿必须指定）
+        """
+        if file_path is not None:
+            return self.save_as(file_path)
         try:
             self._workbook.Save()
         except Exception as e:
@@ -150,15 +158,15 @@ class Workbook:
         :param local:
         :return:
         """
-        if file_format:
-            name_without_ext, _ = os.path.splitext(file_path)
-            file_name = name_without_ext + file_format.value[1]
         full_path = os.path.abspath(file_path)
+        if file_format:
+            # 根据保存格式修正扩展名
+            name_without_ext, _ = os.path.splitext(full_path)
+            full_path = name_without_ext + file_format.value[1]
         dir_path = os.path.dirname(full_path)
         os.makedirs(dir_path, exist_ok=True)
-        file_name = os.path.normpath(file_path)
         try:
-            self._workbook.SaveAs(file_name, file_format.value[0] if file_format else pythoncom.Missing, password,
+            self._workbook.SaveAs(full_path, file_format.value[0] if file_format else pythoncom.Missing, password,
                                   write_res_password,
                                   read_only_recommended, create_backup,
                                   access_mode.value[0] if access_mode else pythoncom.Missing,
@@ -385,6 +393,56 @@ class Workbook:
             )
         except Exception as e:
             raise WorkbookNotFoundError(f"导出 XPS 失败: {e}")
+
+    @property
+    def names(self) -> List[str]:
+        """获取所有命名区域名称"""
+        try:
+            com_names = self._workbook.Names
+            return [com_names.Item(i).Name for i in range(1, com_names.Count + 1)]
+        except Exception as e:
+            raise WorkbookNotFoundError(f"获取命名区域失败: {e}")
+
+    def add_name(self, name: str, refers_to: Union[str, Range]):
+        """
+        添加命名区域
+
+        Args:
+            name: 名称
+            refers_to: Range 对象或引用字符串（如 "=Sheet1!$A$1:$B$10"）
+        """
+        try:
+            if isinstance(refers_to, Range):
+                com = refers_to.com_object
+                refers_to = f"='{com.Worksheet.Name}'!{com.Address}"
+            elif not refers_to.startswith("="):
+                refers_to = "=" + refers_to
+            # 位置参数：Name, RefersTo
+            self._workbook.Names.Add(name, refers_to)
+        except Exception as e:
+            raise WorkbookNotFoundError(f"添加命名区域失败: {e}")
+
+    def get_name(self, name: str) -> Range:
+        """
+        获取命名区域对应的范围
+
+        Args:
+            name: 名称
+
+        Returns:
+            Range 对象
+        """
+        try:
+            return Range(self._workbook.Names.Item(name).RefersToRange)
+        except Exception as e:
+            raise WorkbookNotFoundError(f"获取命名区域失败: {e}")
+
+    def delete_name(self, name: str):
+        """删除命名区域"""
+        try:
+            self._workbook.Names.Item(name).Delete()
+        except Exception as e:
+            raise WorkbookNotFoundError(f"删除命名区域失败: {e}")
 
 
 class Workbooks:

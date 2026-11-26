@@ -139,3 +139,146 @@ class XlPasteSpecialOperation(Enum):
     xlPasteSpecialOperationMultiply = 4  # 复制的数据将乘以目标单元格中的值
     xlPasteSpecialOperationNone = -4142  # 粘贴操作中不执行任何计算
     xlPasteSpecialOperationSubtract = 3  # 复制的数据将从目标单元格中的值中减去
+
+
+class XlCalculation(Enum):
+    """计算模式"""
+    xlCalculationAutomatic = -4105  # 自动计算
+    xlCalculationManual = -4135  # 手动计算
+    xlCalculationSemiautomatic = 2  # 半自动（除表格外自动）
+
+
+class XlDirection(Enum):
+    """移动方向（End 方法）"""
+    xlUp = -4162
+    xlDown = -4121
+    xlToLeft = -4159
+    xlToRight = -4161
+
+
+class XlInsertShiftDirection(Enum):
+    """插入单元格时的移动方向"""
+    xlShiftDown = -4121  # 下移
+    xlShiftToRight = -4161  # 右移
+
+
+class XlDeleteShiftDirection(Enum):
+    """删除单元格时的移动方向"""
+    xlShiftUp = -4162  # 上移
+    xlShiftToLeft = -4159  # 左移
+
+
+class XlCellType(Enum):
+    """SpecialCells 单元格类型"""
+    xlCellTypeBlanks = 4  # 空单元格
+    xlCellTypeConstants = 2  # 常量
+    xlCellTypeFormulas = -4123  # 公式
+    xlCellTypeVisible = 12  # 可见单元格
+    xlCellTypeLastCell = 11  # 最后一个单元格
+    xlCellTypeComments = -4144  # 含批注
+    xlCellTypeAllValidation = -4174  # 含数据验证
+    xlCellTypeAllFormatConditions = -4172  # 含条件格式
+
+
+class XlAutoFilterOperator(Enum):
+    """自动筛选运算符"""
+    xlAnd = 1  # 两个条件逻辑与
+    xlOr = 2  # 两个条件逻辑或
+    xlTop10Items = 3  # 前 N 项
+    xlBottom10Items = 4  # 后 N 项
+    xlTop10Percent = 5  # 前 N 百分比
+    xlBottom10Percent = 6  # 后 N 百分比
+    xlFilterValues = 7  # 值列表筛选
+
+
+class XlFormatConditionOperator(Enum):
+    """条件格式单元格值规则运算符"""
+    xlBetween = 1
+    xlNotBetween = 2
+    xlEqual = 3
+    xlNotEqual = 4
+    xlGreater = 5
+    xlLess = 6
+    xlGreaterEqual = 7
+    xlLessEqual = 8
+
+
+class XlIconSet(Enum):
+    """条件格式图标集（常用子集）"""
+    xl3Arrows = 1
+    xl3ArrowsGray = 2
+    xl3Flags = 3
+    xl3TrafficLights1 = 4
+    xl3TrafficLights2 = 5
+    xl3Signs = 6
+    xl3Symbols = 7
+    xl3Symbols2 = 8
+    xl4Arrows = 9
+    xl4ArrowsGray = 10
+    xl4CRV = 11
+    xl4TrafficLights = 12
+    xl5Arrows = 13
+    xl5ArrowsGray = 14
+    xl5CRV = 15
+    xl5Quarters = 16
+
+
+class XlBordersIndex(Enum):
+    """边框位置"""
+    xlDiagonalDown = 5
+    xlDiagonalUp = 6
+    xlEdgeLeft = 7
+    xlEdgeTop = 8
+    xlEdgeBottom = 9
+    xlEdgeRight = 10
+    xlInsideVertical = 11
+    xlInsideHorizontal = 12
+
+
+class XlUnderlineStyle(Enum):
+    """字体下划线样式"""
+    xlUnderlineStyleNone = -4142
+    xlUnderlineStyleSingle = 2
+    xlUnderlineStyleDouble = -4119
+    xlUnderlineStyleSingleAccounting = 4
+    xlUnderlineStyleDoubleAccounting = 5
+
+
+class XlChartType(Enum):
+    """图表类型（常用子集）"""
+    xlColumnClustered = 51  # 簇状柱形图
+    xlColumnStacked = 52  # 堆积柱形图
+    xlColumnStacked100 = 53  # 百分比堆积柱形图
+    xlBarClustered = 57  # 簇状条形图
+    xlBarStacked = 58  # 堆积条形图
+    xlLine = 4  # 折线图
+    xlLineMarkers = 65  # 带数据标记的折线图
+    xlLineStacked = 63  # 堆积折线图
+    xlPie = 5  # 饼图
+    xlPieExploded = 69  # 分离型饼图
+    xlDoughnut = -4120  # 圆环图
+    xlArea = 1  # 面积图
+    xlAreaStacked = 76  # 堆积面积图
+    xlXYScatter = -4169  # 散点图
+    xlXYScatterLines = 74  # 带平滑线的散点图
+    xlRadar = -4151  # 雷达图
+    xlBubble = 15  # 气泡图
+
+
+class XlPivotFieldOrientation(Enum):
+    """数据透视表字段方向"""
+    xlHidden = 0
+    xlRowField = 1  # 行字段
+    xlColumnField = 2  # 列字段
+    xlPageField = 3  # 筛选字段
+    xlDataField = 4  # 值字段
+
+
+class XlConsolidationFunction(Enum):
+    """数据透视表值字段汇总方式"""
+    xlSum = -4157
+    xlCount = -4112
+    xlAverage = -4106
+    xlMax = -4136
+    xlMin = -4139
+    xlProduct = -4149

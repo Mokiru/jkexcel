@@ -1,9 +1,15 @@
-from typing import List, Optional, Dict, Any
+import os
+from typing import List, Optional, Dict, Any, Union
+
+import pythoncom
 
 from jkexcel.core.range import Range
 from jkexcel.models.config import SheetVisibility, RangeStyle
-from jkexcel.models.enums import XlFindLookIn, XlLookAt, XlSearchOrder, XlSearchDirection
+from jkexcel.models.enums import XlFindLookIn, XlLookAt, XlSearchOrder, XlSearchDirection, XlDirection, \
+    PageOrientation, PaperSize, XlChartType
 from jkexcel.models.exceptions import WorksheetNotFoundError, RangeError
+from jkexcel.utils.helpers import cell_address_to_indices
+from jkexcel.utils.validators import validate_file_exists
 
 
 class Worksheet:
@@ -20,6 +26,8 @@ class Worksheet:
             raise WorksheetNotFoundError("COM Worksheet 对象不能为 None")
         self._worksheet = com_worksheet
         self._excel = excel_app
+        self._data_ops = None
+        self._format_ops = None
 
     def __repr__(self) -> str:
         return f"<Worksheet '{self.name}'>"
@@ -204,10 +212,11 @@ class Worksheet:
             after: 移动到指定工作表之后
         """
         try:
+            # 与 Copy 同理：动态绑定下关键字参数会丢失，使用位置参数 + None 占位
             if before:
-                self._worksheet.Move(Before=before.com_object)
+                self._worksheet.Move(before.com_object, None)
             elif after:
-                self._worksheet.Move(After=after.com_object)
+                self._worksheet.Move(None, after.com_object)
             else:
                 self._worksheet.Move()
         except Exception as e:
@@ -468,10 +477,457 @@ class Worksheet:
             result = result * 26 + (ord(char) - 64)
         return result
 
+    @property
+    def auto_filter_mode(self) -> bool:
+        """获取或设置自动筛选下拉箭头状态（设为 False 可移除筛选）"""
+        try:
+            return self._worksheet.AutoFilterMode
+        except Exception as e:
+            raise WorksheetNotFoundError(f"获取筛选状态失败: {e}")
+
+    @auto_filter_mode.setter
+    def auto_filter_mode(self, value: bool):
+        try:
+            self._worksheet.AutoFilterMode = value
+        except Exception as e:
+            raise WorksheetNotFoundError(f"设置筛选状态失败: {e}")
+
+    def show_all_data(self):
+        """显示所有数据（清除筛选结果，保留筛选箭头）"""
+        try:
+            if self._worksheet.FilterMode:
+                self._worksheet.ShowAllData()
+        except Exception as e:
+            raise WorksheetNotFoundError(f"显示所有数据失败: {e}")
+
+    def hide_rows(self, row: int, count: int = 1, hidden: bool = True):
+        """
+        隐藏/显示行
+
+        Args:
+            row: 起始行
+            count: 行数
+            hidden: True 隐藏，False 显示
+        """
+        try:
+            self.get_cells(row, 1, row + count - 1, 1).entire_row.hidden = hidden
+        except Exception as e:
+            raise WorksheetNotFoundError(f"设置行隐藏失败: {e}")
+
+    def hide_columns(self, column: int, count: int = 1, hidden: bool = True):
+        """
+        隐藏/显示列
+
+        Args:
+            column: 起始列
+            count: 列数
+            hidden: True 隐藏，False 显示
+        """
+        try:
+            self.get_cells(1, column, 1, column + count - 1).entire_column.hidden = hidden
+        except Exception as e:
+            raise WorksheetNotFoundError(f"设置列隐藏失败: {e}")
+
+    @property
+    def tab_color(self) -> Optional[int]:
+        """获取或设置工作表标签颜色（None 表示无颜色）"""
+        try:
+            color = self._worksheet.Tab.Color
+            return color if color is not False else None
+        except Exception as e:
+            raise WorksheetNotFoundError(f"获取标签颜色失败: {e}")
+
+    @tab_color.setter
+    def tab_color(self, color: Optional[int]):
+        try:
+            if color is None:
+                self._worksheet.Tab.ColorIndex = -4142  # xlColorIndexNone
+            else:
+                self._worksheet.Tab.Color = color
+        except Exception as e:
+            raise WorksheetNotFoundError(f"设置标签颜色失败: {e}")
+
+    def last_row(self, column: int = 1) -> int:
+        """
+        获取指定列的最后一个非空行号（等价 Ctrl+↑）
+
+        Args:
+            column: 参考列号（从1开始）
+        """
+        try:
+            com = self._worksheet
+            return com.Cells(com.Rows.Count, column).End(XlDirection.xlUp.value).Row
+        except Exception as e:
+            raise WorksheetNotFoundError(f"获取最后一行失败: {e}")
+
+    def last_column(self, row: int = 1) -> int:
+        """
+        获取指定行的最后一个非空列号（等价 Ctrl+←）
+
+        Args:
+            row: 参考行号（从1开始）
+        """
+        try:
+            com = self._worksheet
+            return com.Cells(row, com.Columns.Count).End(XlDirection.xlToLeft.value).Column
+        except Exception as e:
+            raise WorksheetNotFoundError(f"获取最后一列失败: {e}")
+
+    def clear(self, clear_contents: bool = True, clear_format: bool = True):
+        """清除整个工作表"""
+        self.cells.clear(clear_contents=clear_contents, clear_format=clear_format)
+
+    def freeze_panes(self, cell: str = "A2"):
+        """
+        冻结窗格（冻结指定单元格上方的行和左侧的列）
+
+        Args:
+            cell: 冻结基准单元格，如 "A2" 冻结首行，"B2" 冻结首行首列
+
+        Note:
+            窗口操作要求应用可见，后台模式下会临时显示窗口并在完成后恢复
+        """
+        try:
+            row, col = cell_address_to_indices(cell)
+            if row <= 1 and col <= 1:
+                raise ValueError("冻结基准单元格不能为 A1")
+            app_com = self._excel.com_object
+            old_visible = app_com.Visible
+            try:
+                app_com.Visible = True
+                self.activate()
+                window = app_com.ActiveWindow
+                window.FreezePanes = False
+                window.SplitRow = row - 1
+                window.SplitColumn = col - 1
+                window.FreezePanes = True
+            finally:
+                app_com.Visible = old_visible
+        except Exception as e:
+            raise WorksheetNotFoundError(f"冻结窗格失败: {e}")
+
+    def unfreeze_panes(self):
+        """取消冻结窗格"""
+        try:
+            app_com = self._excel.com_object
+            old_visible = app_com.Visible
+            try:
+                app_com.Visible = True
+                self.activate()
+                window = app_com.ActiveWindow
+                window.FreezePanes = False
+                window.SplitRow = 0
+                window.SplitColumn = 0
+            finally:
+                app_com.Visible = old_visible
+        except Exception as e:
+            raise WorksheetNotFoundError(f"取消冻结窗格失败: {e}")
+
+    @property
+    def shapes(self):
+        """获取图形对象集合（图片/形状等，COM 对象）"""
+        return self._worksheet.Shapes
+
+    def add_picture(self, file_path: str,
+                    left: float = 0, top: float = 0,
+                    width: float = None, height: float = None,
+                    cell: str = None):
+        """
+        插入图片
+
+        Args:
+            file_path: 图片文件路径
+            left: 左边距（磅）
+            top: 上边距（磅）
+            width: 宽度（磅），None 保持原始尺寸
+            height: 高度（磅），None 保持原始尺寸
+            cell: 指定后以该单元格左上角为插入位置（覆盖 left/top）
+
+        Returns:
+            COM Shape 对象
+        """
+        validate_file_exists(file_path)
+        try:
+            if cell:
+                anchor = self.get_range(cell).com_object
+                left, top = anchor.Left, anchor.Top
+            # 位置参数：Filename, LinkToFile, SaveWithDocument, Left, Top, Width, Height
+            return self._worksheet.Shapes.AddPicture(
+                os.path.abspath(file_path), 0, -1,
+                left, top,
+                -1 if width is None else width,
+                -1 if height is None else height
+            )
+        except Exception as e:
+            raise WorksheetNotFoundError(f"插入图片失败: {e}")
+
+    def add_comment(self, cell: str, text: str):
+        """给单元格添加批注"""
+        self.get_range(cell).add_comment(text)
+
+    def add_chart(self, chart_type: XlChartType = XlChartType.xlColumnClustered,
+                  source_range: str = None,
+                  left: float = 100, top: float = 100,
+                  width: float = 400, height: float = 300):
+        """
+        添加嵌入式图表
+
+        Args:
+            chart_type: 图表类型
+            source_range: 数据源范围地址（含表头），None 表示稍后设置
+            left/top: 图表位置（磅）
+            width/height: 图表大小（磅）
+
+        Returns:
+            Chart 对象
+        """
+        from jkexcel.core.chart import Chart
+        try:
+            # 位置参数：Left, Top, Width, Height
+            chart_obj = self._worksheet.ChartObjects().Add(left, top, width, height)
+            com_chart = chart_obj.Chart
+            com_chart.ChartType = chart_type.value
+            if source_range:
+                com_chart.SetSourceData(self.get_range(source_range).com_object, 2)  # 2=xlColumns
+            return Chart(com_chart, chart_obj)
+        except Exception as e:
+            raise WorksheetNotFoundError(f"添加图表失败: {e}")
+
+    def create_pivot_table(self, source_range: str, dest_cell: str, name: str,
+                           row_fields: List[str] = None,
+                           column_fields: List[str] = None,
+                           data_fields: List[str] = None):
+        """
+        创建数据透视表
+
+        Args:
+            source_range: 源数据范围地址（首行必须为表头）
+            dest_cell: 透视表放置的起始单元格
+            name: 透视表名称
+            row_fields: 行字段列名列表
+            column_fields: 列字段列名列表
+            data_fields: 值字段列名列表（默认求和，更多汇总方式用 PivotTable.add_data_field）
+
+        Returns:
+            PivotTable 对象
+        """
+        from jkexcel.core.pivot import PivotTable
+        try:
+            src = self.get_range(source_range)
+            r, c = src.row, src.column
+            rows, cols = src.shape
+            # R1C1 引用样式（xlR1C1=-4150），避免动态绑定下 Address 参数化调用问题
+            source_ref = f"'{self.name}'!R{r}C{c}:R{r + rows - 1}C{c + cols - 1}"
+            # 位置参数：SourceType(1=xlDatabase), SourceData
+            cache = self._worksheet.Parent.PivotCaches().Create(1, source_ref)
+            dest = self.get_range(dest_cell)
+            # 位置参数：TableDestination, TableName
+            com_pt = cache.CreatePivotTable(dest.com_object, name)
+            pivot = PivotTable(com_pt, cache)
+            for field in row_fields or []:
+                pivot.add_row_field(field)
+            for field in column_fields or []:
+                pivot.add_column_field(field)
+            for field in data_fields or []:
+                pivot.add_data_field(field)
+            return pivot
+        except Exception as e:
+            raise WorksheetNotFoundError(f"创建数据透视表失败: {e}")
+
+    def add_hyperlink(self, cell: str, address: str,
+                      text_to_display: str = None,
+                      screen_tip: str = None,
+                      sub_address: str = None):
+        """给单元格添加超链接"""
+        self.get_range(cell).add_hyperlink(address, text_to_display, screen_tip, sub_address)
+
+    @property
+    def print_area(self) -> str:
+        """获取或设置打印区域（如 "A1:F20"，设为空字符串清除）"""
+        try:
+            return self._worksheet.PageSetup.PrintArea
+        except Exception as e:
+            raise WorksheetNotFoundError(f"获取打印区域失败: {e}")
+
+    @print_area.setter
+    def print_area(self, address: str):
+        try:
+            self._worksheet.PageSetup.PrintArea = address or ""
+        except Exception as e:
+            raise WorksheetNotFoundError(f"设置打印区域失败: {e}")
+
+    def set_print_titles(self, rows: str = None, columns: str = None):
+        """
+        设置每页重复打印的标题行/列
+
+        Args:
+            rows: 标题行，如 "1:2" 或 "$1:$2"
+            columns: 标题列，如 "A:B" 或 "$A:$B"
+        """
+        try:
+            ps = self._worksheet.PageSetup
+            if rows is not None:
+                ps.PrintTitleRows = "" if not rows else "$" + rows.replace("$", "").replace(":", ":$")
+            if columns is not None:
+                ps.PrintTitleColumns = "" if not columns else "$" + columns.replace("$", "").replace(":", ":$")
+        except Exception as e:
+            raise WorksheetNotFoundError(f"设置打印标题失败: {e}")
+
+    def set_page_setup(self,
+                       orientation: PageOrientation = None,
+                       paper_size: PaperSize = None,
+                       zoom: Union[int, bool] = None,
+                       fit_to_pages_wide: int = None,
+                       fit_to_pages_tall: int = None,
+                       left_margin: float = None,
+                       right_margin: float = None,
+                       top_margin: float = None,
+                       bottom_margin: float = None,
+                       header_margin: float = None,
+                       footer_margin: float = None,
+                       center_horizontally: bool = None,
+                       center_vertically: bool = None):
+        """
+        页面设置
+
+        Args:
+            orientation: 纸张方向
+            paper_size: 纸张大小
+            zoom: 缩放百分比（10-400），与 fit_to_pages 互斥
+            fit_to_pages_wide: 缩放为指定页宽（需同时设置 zoom=False 或本方法自动处理）
+            fit_to_pages_tall: 缩放为指定页高
+            left_margin/right_margin/top_margin/bottom_margin: 页边距（厘米）
+            header_margin/footer_margin: 页眉/页脚边距（厘米）
+            center_horizontally: 水平居中
+            center_vertically: 垂直居中
+        """
+        try:
+            ps = self._worksheet.PageSetup
+            app = self._excel.com_object
+            if orientation is not None:
+                ps.Orientation = orientation.value
+            if paper_size is not None:
+                ps.PaperSize = paper_size.value
+            if fit_to_pages_wide is not None or fit_to_pages_tall is not None:
+                ps.Zoom = False
+                # 0 表示自动（COM 中需传 False，直接传 0 会报错）
+                if fit_to_pages_wide is not None:
+                    ps.FitToPagesWide = False if fit_to_pages_wide == 0 else fit_to_pages_wide
+                if fit_to_pages_tall is not None:
+                    ps.FitToPagesTall = False if fit_to_pages_tall == 0 else fit_to_pages_tall
+            elif zoom is not None:
+                ps.Zoom = zoom
+            for attr, cm in (("LeftMargin", left_margin), ("RightMargin", right_margin),
+                             ("TopMargin", top_margin), ("BottomMargin", bottom_margin),
+                             ("HeaderMargin", header_margin), ("FooterMargin", footer_margin)):
+                if cm is not None:
+                    setattr(ps, attr, app.CentimetersToPoints(cm))
+            if center_horizontally is not None:
+                ps.CenterHorizontally = center_horizontally
+            if center_vertically is not None:
+                ps.CenterVertically = center_vertically
+        except Exception as e:
+            raise WorksheetNotFoundError(f"页面设置失败: {e}")
+
+    def set_header(self, left: str = None, center: str = None, right: str = None):
+        """设置页眉（支持 &P 页码、&D 日期等 Excel 页眉代码）"""
+        try:
+            ps = self._worksheet.PageSetup
+            if left is not None:
+                ps.LeftHeader = left
+            if center is not None:
+                ps.CenterHeader = center
+            if right is not None:
+                ps.RightHeader = right
+        except Exception as e:
+            raise WorksheetNotFoundError(f"设置页眉失败: {e}")
+
+    def set_footer(self, left: str = None, center: str = None, right: str = None):
+        """设置页脚（支持 &P 页码、&N 总页数等 Excel 页脚代码）"""
+        try:
+            ps = self._worksheet.PageSetup
+            if left is not None:
+                ps.LeftFooter = left
+            if center is not None:
+                ps.CenterFooter = center
+            if right is not None:
+                ps.RightFooter = right
+        except Exception as e:
+            raise WorksheetNotFoundError(f"设置页脚失败: {e}")
+
+    def print_out(self, copies: int = 1,
+                  preview: bool = False,
+                  active_printer: str = None,
+                  print_to_file: bool = False,
+                  collate: bool = True):
+        """
+        打印工作表
+
+        Args:
+            copies: 份数
+            preview: 是否预览
+            active_printer: 打印机
+            print_to_file: 打印到文件
+            collate: 是否逐份打印
+        """
+        try:
+            if preview:
+                self._worksheet.PrintPreview()
+            else:
+                # 位置参数：From, To, Copies, Preview, ActivePrinter, PrintToFile, Collate
+                self._worksheet.PrintOut(
+                    pythoncom.Missing, pythoncom.Missing, copies, False,
+                    pythoncom.Missing if active_printer is None else active_printer,
+                    print_to_file, collate
+                )
+        except Exception as e:
+            raise WorksheetNotFoundError(f"打印工作表失败: {e}")
+
+    def export_as_pdf(self, file_path: str,
+                      quality: int = 0,  # xlQualityStandard
+                      include_doc_props: bool = True,
+                      ignore_print_areas: bool = False,
+                      open_after_publish: bool = False):
+        """
+        将工作表导出为 PDF
+
+        Args:
+            file_path: 保存路径
+            quality: 质量
+            include_doc_props: 包含文档属性
+            ignore_print_areas: 忽略打印区域
+            open_after_publish: 导出后打开文件
+        """
+        try:
+            # 位置参数：Type, Filename, Quality, IncludeDocProperties, IgnorePrintAreas, From, To, OpenAfterPublish
+            self._worksheet.ExportAsFixedFormat(
+                0, os.path.abspath(file_path), quality,
+                include_doc_props, ignore_print_areas,
+                pythoncom.Missing, pythoncom.Missing, open_after_publish
+            )
+        except Exception as e:
+            raise WorksheetNotFoundError(f"导出 PDF 失败: {e}")
+
     # Range 的便捷方法代理
     def current_region(self, start_cell: str = "A1") -> Range:
         """获取当前区域"""
         return self.get_range(start_cell).current_region
+
+    @property
+    def data(self):
+        """数据操作入口（DataOperations）"""
+        if self._data_ops is None:
+            from jkexcel.operations.data_operations import DataOperations
+            self._data_ops = DataOperations(self)
+        return self._data_ops
+
+    @property
+    def format(self):
+        """格式操作入口（FormatOperations）"""
+        if self._format_ops is None:
+            from jkexcel.operations.format_operations import FormatOperations
+            self._format_ops = FormatOperations(self)
+        return self._format_ops
 
     def find_all(self, what: str, look_in: int = -4163) -> List[Range]:
         """查找所有匹配项"""

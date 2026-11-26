@@ -3,13 +3,15 @@ import psutil
 import time
 import ctypes
 import ctypes.wintypes
-from typing import Optional, List, Dict, Any
+import win32com.client
+from contextlib import contextmanager
+from typing import Optional, List, Dict, Any, Union
 import logging
 
 from jkexcel.core.excel_driver import ExcelApplicationService
 from jkexcel.core.workbooks import Workbooks, Workbook
 from jkexcel.models.config import ExcelConfig
-from jkexcel.models.enums import ExcelType
+from jkexcel.models.enums import ExcelType, XlCalculation
 from jkexcel.models.exceptions import ExcelNotRunningError, ExcelCOMError
 
 logger = logging.getLogger(__name__)
@@ -45,6 +47,7 @@ class ExcelApp:
             self._initialized = False
             self._pid = None
             self._closed_by_workbook = False
+            self._event_sink = None
 
     def __enter__(self):
         """上下文管理器进入"""
@@ -222,6 +225,111 @@ class ExcelApp:
         except Exception as e:
             raise ExcelCOMError(f"计算失败: {e}")
 
+    def _get_app_attr(self, attr: str):
+        """读取应用级 COM 属性"""
+        if not self.is_running:
+            raise ExcelNotRunningError("Excel 未运行")
+        try:
+            return getattr(self._excel, attr)
+        except Exception as e:
+            raise ExcelCOMError(f"获取 {attr} 失败: {e}")
+
+    def _set_app_attr(self, attr: str, value):
+        """设置应用级 COM 属性"""
+        if not self.is_running:
+            raise ExcelNotRunningError("Excel 未运行")
+        try:
+            setattr(self._excel, attr, value)
+        except Exception as e:
+            raise ExcelCOMError(f"设置 {attr} 失败: {e}")
+
+    @property
+    def visible(self) -> bool:
+        """获取或设置 Excel 窗口可见性"""
+        return self._get_app_attr("Visible")
+
+    @visible.setter
+    def visible(self, value: bool):
+        self._set_app_attr("Visible", value)
+
+    @property
+    def screen_updating(self) -> bool:
+        """获取或设置屏幕刷新（批量操作时关闭可大幅提升性能）"""
+        return self._get_app_attr("ScreenUpdating")
+
+    @screen_updating.setter
+    def screen_updating(self, value: bool):
+        self._set_app_attr("ScreenUpdating", value)
+
+    @property
+    def display_alerts(self) -> bool:
+        """获取或设置警告弹窗"""
+        return self._get_app_attr("DisplayAlerts")
+
+    @display_alerts.setter
+    def display_alerts(self, value: bool):
+        self._set_app_attr("DisplayAlerts", value)
+
+    @property
+    def enable_events(self) -> bool:
+        """获取或设置事件触发"""
+        return self._get_app_attr("EnableEvents")
+
+    @enable_events.setter
+    def enable_events(self, value: bool):
+        self._set_app_attr("EnableEvents", value)
+
+    @property
+    def calculation(self) -> XlCalculation:
+        """获取或设置计算模式"""
+        return XlCalculation(self._get_app_attr("Calculation"))
+
+    @calculation.setter
+    def calculation(self, value: Union[XlCalculation, int]):
+        # Excel 限制：没有打开的工作簿时无法设置 Calculation，此时跳过
+        if self._excel.Workbooks.Count == 0:
+            return
+        self._set_app_attr("Calculation", value.value if isinstance(value, XlCalculation) else value)
+
+    @contextmanager
+    def suspend(self, screen_updating: bool = False,
+                enable_events: bool = False,
+                display_alerts: bool = False,
+                calculation: XlCalculation = XlCalculation.xlCalculationManual):
+        """
+        批量操作上下文：临时关闭屏幕刷新/事件/弹窗并切换计算模式，退出时自动恢复
+
+        用法：
+            with app.suspend():
+                ws.write_data(big_data)
+            # 退出后自动恢复原状态并重新计算
+
+        Args:
+            screen_updating: 上下文内的屏幕刷新状态
+            enable_events: 上下文内的事件触发状态
+            display_alerts: 上下文内的警告弹窗状态
+            calculation: 上下文内的计算模式
+        """
+        saved = {
+            "ScreenUpdating": self.screen_updating,
+            "EnableEvents": self.enable_events,
+            "DisplayAlerts": self.display_alerts,
+            "Calculation": self._get_app_attr("Calculation"),
+        }
+        try:
+            self.screen_updating = screen_updating
+            self.enable_events = enable_events
+            self.display_alerts = display_alerts
+            self.calculation = calculation
+            yield self
+        finally:
+            # 先恢复计算模式再恢复屏幕刷新，避免恢复时大量重算闪烁
+            for attr in ("Calculation", "EnableEvents", "DisplayAlerts", "ScreenUpdating"):
+                try:
+                    setattr(self._excel, attr, saved[attr])
+                except Exception:
+                    pass
+
     def wait(self, seconds: float):
         """
         等待指定时间
@@ -237,7 +345,12 @@ class ExcelApp:
         """
         if not self.is_running or not self._excel:
             return
-            # 关闭所有工作簿
+        # 先断开事件监听，避免退出过程中回调访问已释放对象
+        try:
+            self.detach_events()
+        except Exception:
+            pass
+        # 关闭所有工作簿
         for wb in self.workbooks:
             try:
                 wb.close(save_changes=False)
@@ -301,6 +414,43 @@ class ExcelApp:
             return self._excel.Run(macro_name, *args)
         except Exception as e:
             raise ExcelCOMError(f"运行宏失败: {e}")
+
+    def attach_events(self, handler):
+        """
+        监听应用级事件
+
+        Args:
+            handler: ExcelEvents 子类实例，重写关心的 on_* 方法
+
+        Note:
+            事件通过 COM 消息泵分发，脚本中需定期调用 pump_events()
+        """
+        if not self.is_running:
+            raise ExcelNotRunningError("Excel 未运行")
+        if self._event_sink is not None:
+            raise ExcelCOMError("已监听事件，请先 detach_events")
+        try:
+            from jkexcel.core.events import _AppEventSink
+            _AppEventSink._handler = handler
+            self._event_sink = win32com.client.WithEvents(self._excel, _AppEventSink)
+            return self._event_sink
+        except Exception as e:
+            raise ExcelCOMError(f"监听事件失败: {e}")
+
+    def detach_events(self):
+        """断开事件监听"""
+        if self._event_sink is not None:
+            try:
+                self._event_sink.close()
+            finally:
+                self._event_sink = None
+                from jkexcel.core.events import _AppEventSink
+                _AppEventSink._handler = None
+
+    @staticmethod
+    def pump_events():
+        """分发待处理的 COM 事件（在消息循环/等待中定期调用）"""
+        pythoncom.PumpWaitingMessages()
 
     def get_open_workbook_names(self) -> List[str]:
         """

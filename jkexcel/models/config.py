@@ -279,13 +279,20 @@ class ExcelConfig:
 
 @dataclass
 class RangeStyle:
-    """范围样式配置"""
+    """范围样式配置
+
+    borders 边框配置字典，键为边框位置，值为线型或 {"line_style": ..., "weight": ..., "color": ...}：
+        位置可选 "all"/"left"/"right"/"top"/"bottom"/"inside_vertical"/"inside_horizontal"
+        例：{"all": {"line_style": BorderLineStyle.CONTINUOUS, "weight": BorderWeight.THIN, "color": 0}}
+    """
     font_name: Optional[str] = None
     font_size: Optional[float] = None
     font_bold: Optional[bool] = None
     font_italic: Optional[bool] = None
     font_color: Optional[int] = None
     font_color_rgb: Optional[Tuple[int, int, int]] = None
+    font_underline: Optional[int] = None
+    font_strikethrough: Optional[bool] = None
     fill_color: Optional[int] = None
     fill_color_rgb: Optional[Tuple[int, int, int]] = None
     horizontal_alignment: Optional[int] = None

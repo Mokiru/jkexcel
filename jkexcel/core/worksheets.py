@@ -102,12 +102,19 @@ class Worksheets:
                     com_sheet = self._worksheets.Add()
                 return Worksheet(com_sheet, self._excel)
             else:
+                # 先解析 before/after 对应的 COM 对象，支持 Worksheet/索引/名称
+                before_com = None
+                after_com = None
+                if before is not None:
+                    before_com = before.com_object if isinstance(before, Worksheet) else self.get(before).com_object
+                elif after is not None:
+                    after_com = after.com_object if isinstance(after, Worksheet) else self.get(after).com_object
                 sheets = []
                 for _ in range(count):
-                    if before:
-                        com_sheet = self._worksheets.Add(Before=self.get(before).com_object)
-                    elif after:
-                        com_sheet = self._worksheets.Add(After=self.get(after).com_object)
+                    if before_com is not None:
+                        com_sheet = self._worksheets.Add(Before=before_com)
+                    elif after_com is not None:
+                        com_sheet = self._worksheets.Add(After=after_com)
                     else:
                         com_sheet = self._worksheets.Add()
                     sheets.append(Worksheet(com_sheet, self._excel))
